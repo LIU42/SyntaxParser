@@ -3,19 +3,12 @@ from items import Item
 class BuildRecorder:
 
     def __init__(self, items_path: str = "./records/itemsets.txt", conflicts_path: str = "./records/conflicts.txt") -> None:
-        self.items_path = items_path
-        self.conflicts_path = conflicts_path
-        self.items_file = None
-        self.conflicts_file = None
+        self.items_file = open(items_path, "w+", encoding = "utf-8")
+        self.conflicts_file = open(conflicts_path, "w+", encoding = "utf-8")
 
     def __del__(self) -> None:
-        if self.items_file is not None and self.conflicts_file is not None:
-            self.items_file.close()
-            self.conflicts_file.close()
-
-    def open_files(self) -> None:
-        self.items_file = open(self.items_path, "w+", encoding = "utf-8")
-        self.conflicts_file = open(self.conflicts_path, "w+", encoding = "utf-8")
+        self.items_file.close()
+        self.conflicts_file.close()
 
     def write_items(self, number: int, items: frozenset[Item]) -> None:
         self.items_file.write(f"ItemsNo: {number}\n")

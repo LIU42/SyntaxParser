@@ -1,3 +1,4 @@
+from language import GrammarLoader
 from language import Token
 from language import FormulaElement
 from tables import ActionGotoTable
@@ -10,10 +11,11 @@ class SyntaxError:
     def __str__(self) -> str:
         return f"Error at {self.token.line_no}:{self.token.index} \"{self.token.word}\""
 
+
 class SyntaxParser:
 
-    def __init__(self, grammar_dict: dict[str, list[str]]) -> None:
-        self.action_goto_table = ActionGotoTable(grammar_dict["formulas"])
+    def __init__(self, grammar_loader: GrammarLoader = GrammarLoader()) -> None:
+        self.action_goto_table = ActionGotoTable(grammar_loader.get_formulas())
         self.action_goto_table.load()
         self.symbol_stack = list[FormulaElement]()
         self.status_stack = list[int]()
@@ -24,10 +26,12 @@ class SyntaxParser:
     def action_error_handler(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
         error_list.append(SyntaxError(token_list[token_index]))
         token_index += 1
+
         while token_index < len(token_list):
             if self.action_goto_table.get_action(self.status_stack[-1], token_list[token_index]) is not None:
                 break
             token_index += 1
+
         return token_index >= len(token_list), token_index
     
     def goto_error_handler(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
@@ -43,6 +47,7 @@ class SyntaxParser:
             return self.action_error_handler(token_list, token_index, error_list)
         if action_option.is_accept():
             return True, token_index
+        
         if action_option.is_shift():
             self.symbol_stack.append(FormulaElement(token = current_token))
             self.status_stack.append(action_option.number)
@@ -60,6 +65,7 @@ class SyntaxParser:
             if goto_status is None:
                 return self.goto_error_handler(token_list, token_index, error_list)
             self.status_stack.append(goto_status)
+            
         return False, token_index
 
     def parse(self, token_list: list[Token]) -> list[SyntaxError]:

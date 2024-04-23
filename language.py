@@ -1,3 +1,4 @@
+import json
 import re
 
 class Token:
@@ -22,7 +23,8 @@ class Token:
         if self.type == "identifiers" or self.type == "constants":
             return hash(self.type)
         return hash(self.type) + hash(self.word)
-    
+
+
 class TokenParser:
 
     @staticmethod
@@ -42,7 +44,8 @@ class TokenParser:
             token_list.append(TokenParser.parse_full(line.strip()))
         token_list.append(Token())
         return token_list
-    
+
+
 class FormulaElement:
 
     def __init__(self, token: Token = None, symbol: str = None) -> None:
@@ -77,6 +80,7 @@ class FormulaElement:
     
     def is_symbol(self) -> bool:
         return self.symbol is not None
+    
 
 class Formula:
 
@@ -95,6 +99,7 @@ class Formula:
         for item in self.right_part:
             hash_code += hash(item)
         return hash_code
+
 
 class FormulaParser:
 
@@ -116,21 +121,29 @@ class FormulaParser:
             formula_list.append(FormulaParser.parse(formula.strip()))
         return formula_list
 
+
 class FormulaUtils:
 
     @staticmethod
-    def get_index_map(formula_list: list[Formula]) -> dict[Formula, int]:
-        formula_index_map = dict[Formula, int]()
+    def get_index_dict(formula_list: list[Formula]) -> dict[Formula, int]:
+        index_dict = dict[Formula, int]()
         for index, formula in enumerate(formula_list, start = 0):
-            formula_index_map[formula] = index
-        return formula_index_map
+            index_dict[formula] = index
+        return index_dict
     
     @staticmethod
-    def get_left_part_map(formula_list: list[Formula]) -> dict[str, set[Formula]]:
-        left_part_map = dict[str, set[Formula]]()
+    def get_search_dict(formula_list: list[Formula]) -> dict[str, set[Formula]]:
+        search_dict = dict[str, set[Formula]]()
         for formula in formula_list:
-            symbol = formula.left_part.symbol
-            if left_part_map.get(symbol) is None:
-                left_part_map[symbol] = set[Formula]()
-            left_part_map[symbol].add(formula)
-        return left_part_map
+            search_dict.setdefault(formula.left_part.symbol, set[Formula]()).add(formula)
+        return search_dict
+    
+
+class GrammarLoader:
+
+    def __init__(self, grammar_path: str = "./grammars/grammar.json") -> None:
+        with open(grammar_path, "r", encoding = "utf-8") as grammar_file:
+            self.grammar_dict = json.load(grammar_file)
+        
+    def get_formulas(self, label: str = "formulas") -> list[Formula]:
+        return FormulaParser.parse_list(self.grammar_dict[label])

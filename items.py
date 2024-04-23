@@ -36,121 +36,119 @@ class Item:
         if self.forward_index + 1 >= len(self.formula.right_part):
             return None
         return self.formula.right_part[self.forward_index + 1]
-    
-class ItemSet:
 
-    def __init__(self, items: set[Item] = set[Item]()) -> None:
-        self.content = frozenset[Item](items)
 
-    def __eq__(self, item_set: 'ItemSet') -> bool:
-        return self.content == item_set.content
-    
-    def __hash__(self) -> int:
-        return hash(self.content)
-    
-    def copy_editable(self) -> set[Item]:
-        return set[Item](self.content)
-    
 class ItemSetUtils:
 
     @staticmethod
-    def create_by_items(*items: Item) -> ItemSet:
-        return ItemSet(items)
+    def create_by_items(*items: Item) -> frozenset[Item]:
+        return frozenset[Item](items)
+    
+    @staticmethod
+    def create_token_set(*tokens: Token) -> set[Token]:
+        return set[Token](tokens)
 
     @staticmethod
-    def get_first_set(element: FormulaElement, left_part_map: dict[str, set[Formula]], except_set: set[str] = set[str]()) -> set[Token]:
+    def get_first_set(element: FormulaElement, search_dict: dict[str, set[Formula]], except_set: set[str] = set[str]()) -> set[Token]:
         first_set = set[Token]()
         if element.is_token():
             first_set.add(element.token)
             return first_set
+        
         new_except_set = except_set.copy()
         new_except_set.add(element.symbol)
-        for formula in left_part_map[element.symbol]:
+
+        for formula in search_dict[element.symbol]:
             if formula.right_part[0].symbol not in new_except_set:
-                first_set = first_set.union(ItemSetUtils.get_first_set(formula.right_part[0], left_part_map, new_except_set))
+                first_set = first_set.union(ItemSetUtils.get_first_set(formula.right_part[0], search_dict, new_except_set))
+
         return first_set
     
     @staticmethod
-    def get_new_item(item: Item, status: str, left_part_map: dict[str, set[Formula]]) -> set[Item]:
+    def get_new_items(item: Item, status: str, search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
         new_item_set = set[Item]()
-        for formula in left_part_map[status]:
+        for formula in search_dict[status]:
             if next_element := item.get_next_element():
-                forward_set = ItemSetUtils.get_first_set(next_element, left_part_map)
+                forward_set = ItemSetUtils.get_first_set(next_element, search_dict)
             else:
-                forward_set = { item.forward_token }
+                forward_set = ItemSetUtils.create_token_set(item.forward_token)
+
             for forward_token in forward_set:
                 new_item_set.add(Item(formula, 0, forward_token))
-        return new_item_set
+
+        return frozenset[Item](new_item_set)
     
     @staticmethod
-    def get_closure(item_set: ItemSet, left_part_map: dict[str, set[Formula]]) -> ItemSet:
-        closure_item_set = item_set.copy_editable()
-        item_buffer = item_set.copy_editable()
+    def get_closure(item_set: frozenset[Item], search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
+        closure_item_set = set[Item](item_set)
+        item_buffer = set[Item](item_set)
+
         while True:
             search_items = item_buffer.copy()
             item_buffer.clear()
+
             for item in search_items:
                 if item.is_search_finished() or item.get_current_element().is_token():
                     continue
-                for new_item in ItemSetUtils.get_new_item(item, item.get_current_element().symbol, left_part_map):
+                for new_item in ItemSetUtils.get_new_items(item, item.get_current_element().symbol, search_dict):
                     if new_item not in closure_item_set:
                         item_buffer.add(new_item)
+
             if len(item_buffer) == 0:
                 break
             closure_item_set = closure_item_set.union(item_buffer)
-        return ItemSet(closure_item_set)
+
+        return frozenset[Item](closure_item_set)
     
     @staticmethod
-    def get_next_elements(item_set: ItemSet) -> set[FormulaElement]:
+    def get_next_elements(item_set: frozenset[Item]) -> set[FormulaElement]:
         element_set = set[FormulaElement]()
-        for item in item_set.content:
+        for item in item_set:
             if element := item.get_current_element():
                 element_set.add(element)
         return element_set
     
     @staticmethod
-    def goto(item_set: ItemSet, element: FormulaElement) -> ItemSet:
+    def goto(item_set: frozenset[Item], element: FormulaElement) -> frozenset[Item]:
         goto_item_set = set[Item]()
-        for item in item_set.content:
+        for item in item_set:
             if current_element := item.get_current_element():
                 if current_element != element:
                     continue
                 goto_item_set.add(Item(item.formula, item.forward_index + 1, item.forward_token))
-        return ItemSet(goto_item_set)
+        return frozenset[Item](goto_item_set)
     
     @staticmethod
-    def get_next_items(item_set: ItemSet, element: FormulaElement, left_part_map: dict[str, set[Formula]]) -> ItemSet:
-        return ItemSetUtils.get_closure(ItemSetUtils.goto(item_set, element), left_part_map)
-    
-class ItemSetMap:
+    def get_next_items(item_set: frozenset[Item], element: FormulaElement, search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
+        return ItemSetUtils.get_closure(ItemSetUtils.goto(item_set, element), search_dict)
+
+
+class ItemsNumberDict:
 
     def __init__(self) -> None:
-        self.items_number_map = dict[ItemSet, int]()
-        self.number_items_map = dict[int, ItemSet]()
-        self.element_count = 0
+        self.items_number_dict = dict[frozenset[Item], int]()
+        self.items_count = 0
 
-    def __contains__(self, key: object) -> bool:
-        if isinstance(key, ItemSet):
-            return key in self.items_number_map
-        if isinstance(key, int):
-            return key in self.number_items_map
-        return False
+    def __contains__(self, key: frozenset[Item]) -> bool:
+        return key in self.items_number_dict
     
-    def if_add(self, item_set: ItemSet) -> bool:
-        if item_set in self.items_number_map:
+    def __getitem__(self, item_set: frozenset[Item]) -> int:
+        return self.get_number(item_set)
+    
+    def try_add(self, item_set: frozenset[Item]) -> bool:
+        if item_set in self.items_number_dict:
             return False
-        self.items_number_map[item_set] = self.element_count
-        self.number_items_map[self.element_count] = item_set
-        self.element_count += 1
-        return True
+        else:
+            self.items_number_dict[item_set] = self.items_count
+            self.items_count += 1
+            return True
     
-    def get_number(self, item_set: ItemSet) -> int:
-        return self.items_number_map.get(item_set)
-    
-    def get_items(self, number: int) -> ItemSet:
-        return self.number_items_map.get(number)
+    def get_number(self, item_set: frozenset[Item]) -> int:
+        try:
+            return self.items_number_dict[item_set]
+        except KeyError:
+            return None
     
     def clear(self) -> None:
-        self.items_number_map.clear()
-        self.number_items_map.clear()
-        self.element_count = 0
+        self.items_number_dict.clear()
+        self.items_count = 0

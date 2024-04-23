@@ -1,13 +1,11 @@
-import json
-
-from parsers import SyntaxParser
+from language import GrammarLoader
 from language import TokenParser
+from parsers import SyntaxParser
 
 class MainProgram:
 
-    def __init__(self, grammar_path: str = "./grammars/grammar.json") -> None:
-        with open(grammar_path, "r", encoding = "utf-8") as grammar_file:
-            self.parser = SyntaxParser(json.load(grammar_file))
+    def __init__(self) -> None:
+        self.parser = SyntaxParser(GrammarLoader())
 
     def parse_file(self, input_path: str = "./inputs/input1.txt", output_path: str = "./outputs/output1.txt") -> None:
         with open(input_path, "r", encoding = "utf-8") as input_file:
@@ -21,6 +19,7 @@ class MainProgram:
                     output_file.write(f"{error}\n")
             else:
                 output_file.write("Success\n")
+
 
 if __name__ == "__main__":
     main_program = MainProgram()

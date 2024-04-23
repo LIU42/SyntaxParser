@@ -1,2 +1,6 @@
 Failure
-Error at 1:0 "int"
+Error at 5:42 ";"
+Error at 7:32 "="
+Error at 11:44 ")"
+Error at 28:15 ","
+Error at 30:15 "=="
