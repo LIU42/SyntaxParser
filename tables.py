@@ -10,20 +10,45 @@ from items import ItemsNumberDict
 from items import ItemSetUtils
 from recorders import BuildRecorder
 
-class StatusTransforms:
+class AbstractTable:
 
-    def __init__(self, recorder: BuildRecorder) -> None:
+    def __init__(self, name: str, recorder: BuildRecorder = None) -> None:
+        self.items = dict()
+        self.name = name
         self.recorder = recorder
-        self.transforms = dict[int, dict[FormulaElement, int]]()
 
-    def create_elements_dict(self, *elements: tuple[FormulaElement, int]) -> dict[FormulaElement, int]:
-        return dict[FormulaElement, int](elements)
+    def add_item(self, row: object, col: object, value: object) -> None:
+        if self.items.setdefault(row, dict()).get(col) is None:
+            self.items[row][col] = value
+        elif self.recorder is not None:
+            self.recorder.write_conflict(self.name, row, col, self.items[row][col], value)
 
+    def get_item(self, row: object, col: object) -> object:
+        return self.items[row][col]
+    
+    def to_sparse_list(self) -> list[tuple[object, object, object]]:
+        sparse_list = list()
+        for row, col_value_dict in self.items.items():
+            for col, value in col_value_dict.items():
+                sparse_list.append((row, col, value))
+        return sparse_list
+
+    @staticmethod
+    def to_sparse_line(row: object, col: object, value: object) -> str:
+        return f"{str(row)} {str(col)} {str(value)}\n"
+    
+    @staticmethod
+    def get_sparse_items(line: str) -> list[str]:
+        return line.strip().split()
+
+
+class StatusTransforms(AbstractTable):
+
+    def __init__(self, name: str = "transforms", recorder: BuildRecorder = None) -> None:
+        super().__init__(name, recorder)
+    
     def add_transform(self, status_from: int, element: FormulaElement, status_to: int) -> None:
-        if self.transforms.setdefault(status_from, self.create_elements_dict()).get(element) is None:
-            self.transforms[status_from][element] = status_to
-        else:
-            self.recorder.write_conflict("transforms", status_from, element, self.transforms[status_from][element], status_to)
+        self.add_item(status_from, element, status_to)
 
 
 class ActionOption:
@@ -54,71 +79,49 @@ class ActionOption:
         return self.accept
 
 
-class ActionTable:
+class ActionTable(AbstractTable):
 
-    def __init__(self, recorder: BuildRecorder = None) -> None:
-        self.recorder = recorder
-        self.actions = dict[int, dict[Token, ActionOption]]()
+    def __init__(self, name: str = "actions", recorder: BuildRecorder = None) -> None:
+        super().__init__(name, recorder)
 
     def __getitem__(self, action_index: tuple[int, Token]) -> ActionOption:
-        return self.get_action(*action_index)
-    
-    def create_tokens_dict(self, *tokens: tuple[Token, ActionOption]) -> dict[Token, ActionOption]:
-        return dict[Token, ActionOption](tokens)
+        return self.get_item(*action_index)
     
     def add_action(self, status_from: int, token: Token, option: ActionOption) -> None:
-        if self.actions.setdefault(status_from, self.create_tokens_dict()).get(token) is None:
-            self.actions[status_from][token] = option
-        elif self.recorder is not None:
-            self.recorder.write_conflict("actions", status_from, token, self.actions[status_from][token], option)
-
-    def get_action(self, status_from: int, token: Token) -> ActionOption:
-        return self.actions[status_from][token]
+        self.add_item(status_from, token, option)
 
     def save(self, save_path: str) -> None:
         with open(save_path, "w+", encoding = "utf-8") as save_file:
-            for status_from, tokens_dict in self.actions.items():
-                for token, option in tokens_dict.items():
-                    save_file.write(f"{status_from} {token} {option}\n")
+            for status_from, token, option in self.to_sparse_list():
+                save_file.write(AbstractTable.to_sparse_line(status_from, token, option))
 
     def load(self, load_path: str) -> None:
         with open(load_path, "r", encoding = "utf-8") as load_file:
             for line in load_file.readlines():
-                status_from, token, option = line.strip().split()
+                status_from, token, option = AbstractTable.get_sparse_items(line)
                 self.add_action(int(status_from), TokenParser.parse_simply(token), ActionOption.parse(option))
 
 
-class GotoTable:
+class GotoTable(AbstractTable):
 
-    def __init__(self, recorder: BuildRecorder = None) -> None:
-        self.recorder = recorder
-        self.gotos = dict[int, dict[str, int]]()
+    def __init__(self, name: str = "gotos", recorder: BuildRecorder = None) -> None:
+        super().__init__(name, recorder)
 
     def __getitem__(self, goto_index: tuple[int, str]) -> int:
-        return self.get_goto(*goto_index)
-    
-    def create_symbols_dict(self, *symbols: tuple[str, int]) -> dict[str, int]:
-        return dict[str, int](symbols)
+        return self.get_item(*goto_index)
 
     def add_goto(self, status_from: int, symbol: str, status_to: int) -> None:
-        if self.gotos.setdefault(status_from, self.create_symbols_dict()).get(symbol) is None:
-            self.gotos[status_from][symbol] = status_to
-        elif self.recorder is not None:
-            self.recorder.write_conflict("gotos", status_from, symbol, self.gotos[status_from][symbol], status_to)
-
-    def get_goto(self, status_from: int, symbol: str) -> int:
-        return self.gotos[status_from][symbol]
+        self.add_item(status_from, symbol, status_to)
 
     def save(self, save_path: str) -> None:
         with open(save_path, "w+", encoding = "utf-8") as save_file:
-            for status_from, symbols_dict in self.gotos.items():
-                for symbol, status_to, in symbols_dict.items():
-                    save_file.write(f"{status_from} {symbol} {status_to}\n")
+            for status_from, symbol, status_to in self.to_sparse_list():
+                save_file.write(AbstractTable.to_sparse_line(status_from, symbol, status_to))
 
     def load(self, load_path: str) -> None:
         with open(load_path, "r", encoding = "utf-8") as load_file:
             for line in load_file.readlines():
-                status_from, symbol, status_to = line.strip().split()
+                status_from, symbol, status_to = AbstractTable.get_sparse_items(line)
                 self.add_goto(int(status_from), symbol, int(status_to))
 
 
@@ -127,17 +130,18 @@ class ActionGotoTable:
     def __init__(self, formula_list: list[Formula], recorder: BuildRecorder = None) -> None:
         self.formula_list = formula_list
         self.recorder = recorder
-        self.action_table = ActionTable(recorder)
-        self.goto_table = GotoTable(recorder)
+        self.action_table = ActionTable(recorder = recorder)
+        self.goto_table = GotoTable(recorder = recorder)
 
     def create_item_sets(self) -> tuple[ItemsNumberDict, StatusTransforms]:
+        transforms = StatusTransforms(recorder = self.recorder)
         search_dict = FormulaUtils.get_search_dict(self.formula_list)
-        transforms = StatusTransforms(self.recorder)
-        items_dict = ItemsNumberDict()
-        items_buffer = set[frozenset[Item]]()
 
         init_items = ItemSetUtils.get_closure(ItemSetUtils.create_by_items(Item(self.formula_list[0])), search_dict)
+        items_dict = ItemsNumberDict()
         items_dict.try_add(init_items)
+
+        items_buffer = set()
         items_buffer.add(init_items)
 
         while len(items_buffer) > 0:
@@ -149,36 +153,34 @@ class ActionGotoTable:
                     next_items = ItemSetUtils.get_next_items(items, element, search_dict)
 
                     if items_dict.try_add(next_items):
-                        self.recorder.write_items(items_dict.get_number(next_items), next_items)
+                        self.recorder.write_items(items_dict[next_items], next_items)
                         items_buffer.add(next_items)
                     transforms.add_transform(items_dict[items], element, items_dict[next_items])
 
         return items_dict, transforms
     
-    def setup_action_goto_table(self, item_sets_params: tuple[ItemsNumberDict, StatusTransforms], accept_token: Token = Token()) -> None:
-        items_dict, transforms = item_sets_params
-        index_dict = FormulaUtils.get_index_dict(self.formula_list)
+    def setup_action_goto_table(self, items_dict: ItemsNumberDict, transforms: StatusTransforms) -> None:
+        for status_from, element, status_to in transforms.to_sparse_list():
+            if element.is_token():
+                self.action_table.add_action(status_from, element.token, ActionOption(option = "S", number = status_to))
+            elif element.is_symbol():
+                self.goto_table.add_goto(status_from, element.symbol, status_to)
 
-        for status_from, elements_dict in transforms.transforms.items():
-            for element, status_to in elements_dict.items():
-                if element.is_token():
-                    self.action_table.add_action(status_from, element.token, ActionOption(option = "S", number = status_to))
-                elif element.is_symbol():
-                    self.goto_table.add_goto(status_from, element.symbol, status_to)
+        index_dict = FormulaUtils.get_index_dict(self.formula_list)
 
         for item_set, number in items_dict.items_number_dict.items():
             for item in item_set:
                 if not item.is_search_finished():
                     continue
-                if item.formula == self.formula_list[0] and item.forward_token == accept_token:
+                if item.formula == self.formula_list[0] and item.forward_token.is_accept():
                     option = ActionOption(accept = True)
                 else:
                     option = ActionOption(option = "R", number = index_dict[item.formula])
 
-                self.action_table.add_action(number, item.forward_token, option)     
+                self.action_table.add_action(number, item.forward_token, option)
 
     def build(self) -> None:
-        self.setup_action_goto_table(self.create_item_sets())
+        self.setup_action_goto_table(*self.create_item_sets())
 
     def save(self, action_path: str = "./tables/action.txt", goto_path: str = "./tables/goto.txt") -> None:
         self.action_table.save(action_path)

@@ -23,6 +23,9 @@ class Token:
         if self.type == "identifiers" or self.type == "constants":
             return hash(self.type)
         return hash(self.type) + hash(self.word)
+    
+    def is_accept(self) -> bool:
+        return self.type == "ends" and self.word == "#"
 
 
 class TokenParser:
@@ -39,7 +42,7 @@ class TokenParser:
     
     @staticmethod
     def parse_lines(token_lines: list[str]) -> list[Token]:
-        token_list = list[Token]()
+        token_list = list()
         for line in token_lines:
             token_list.append(TokenParser.parse_full(line.strip()))
         token_list.append(Token())
@@ -73,7 +76,8 @@ class FormulaElement:
     def __hash__(self) -> int:
         if self.token is not None:
             return hash(self.token)
-        return hash(self.symbol)
+        else:
+            return hash(self.symbol)
     
     def is_token(self) -> bool:
         return self.token is not None
@@ -106,7 +110,7 @@ class FormulaParser:
     @staticmethod
     def parse(input: str) -> Formula:
         left_part_content, right_part_content = input.split(" -> ")
-        right_part = list[FormulaElement]()
+        right_part = list()
         for item in right_part_content.split():
             if item[0] == "<":
                 right_part.append(FormulaElement(token = TokenParser.parse_simply(item)))
@@ -116,7 +120,7 @@ class FormulaParser:
     
     @staticmethod
     def parse_list(formulas: list[str]) -> list[Formula]:
-        formula_list = list[Formula]()
+        formula_list = list()
         for formula in formulas:
             formula_list.append(FormulaParser.parse(formula.strip()))
         return formula_list
@@ -126,16 +130,16 @@ class FormulaUtils:
 
     @staticmethod
     def get_index_dict(formula_list: list[Formula]) -> dict[Formula, int]:
-        index_dict = dict[Formula, int]()
+        index_dict = dict()
         for index, formula in enumerate(formula_list, start = 0):
             index_dict[formula] = index
         return index_dict
     
     @staticmethod
     def get_search_dict(formula_list: list[Formula]) -> dict[str, set[Formula]]:
-        search_dict = dict[str, set[Formula]]()
+        search_dict = dict()
         for formula in formula_list:
-            search_dict.setdefault(formula.left_part.symbol, set[Formula]()).add(formula)
+            search_dict.setdefault(formula.left_part.symbol, set()).add(formula)
         return search_dict
     
 

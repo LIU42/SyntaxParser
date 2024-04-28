@@ -4,10 +4,13 @@ from language import FormulaElement
 
 class Item:
 
-    def __init__(self, formula: Formula, forward_index: int = 0, forward_token: Token = Token()) -> None:
+    def __init__(self, formula: Formula, forward_index: int = 0, forward_token: Token = None) -> None:
         self.formula = formula
         self.forward_index = forward_index
-        self.forward_token = forward_token
+        if forward_token is None:
+            self.forward_token = Token()
+        else:
+            self.forward_token = forward_token
 
     def __str__(self) -> str:
         return f"{self.formula}, {self.forward_index}, {self.forward_token}"
@@ -42,20 +45,23 @@ class ItemSetUtils:
 
     @staticmethod
     def create_by_items(*items: Item) -> frozenset[Item]:
-        return frozenset[Item](items)
+        return frozenset(items)
     
     @staticmethod
     def create_token_set(*tokens: Token) -> set[Token]:
-        return set[Token](tokens)
+        return set(tokens)
 
     @staticmethod
-    def get_first_set(element: FormulaElement, search_dict: dict[str, set[Formula]], except_set: set[str] = set[str]()) -> set[Token]:
-        first_set = set[Token]()
+    def get_first_set(element: FormulaElement, search_dict: dict[str, set[Formula]], except_set: set[str] = None) -> set[Token]:
+        first_set = set()
         if element.is_token():
             first_set.add(element.token)
             return first_set
         
-        new_except_set = except_set.copy()
+        if except_set is None:
+            new_except_set = set()
+        else:
+            new_except_set = except_set.copy()
         new_except_set.add(element.symbol)
 
         for formula in search_dict[element.symbol]:
@@ -66,7 +72,7 @@ class ItemSetUtils:
     
     @staticmethod
     def get_new_items(item: Item, status: str, search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
-        new_item_set = set[Item]()
+        new_item_set = set()
         for formula in search_dict[status]:
             if next_element := item.get_next_element():
                 forward_set = ItemSetUtils.get_first_set(next_element, search_dict)
@@ -76,12 +82,12 @@ class ItemSetUtils:
             for forward_token in forward_set:
                 new_item_set.add(Item(formula, 0, forward_token))
 
-        return frozenset[Item](new_item_set)
+        return frozenset(new_item_set)
     
     @staticmethod
     def get_closure(item_set: frozenset[Item], search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
-        closure_item_set = set[Item](item_set)
-        item_buffer = set[Item](item_set)
+        closure_item_set = set(item_set)
+        item_buffer = set(item_set)
 
         while True:
             search_items = item_buffer.copy()
@@ -98,11 +104,11 @@ class ItemSetUtils:
                 break
             closure_item_set = closure_item_set.union(item_buffer)
 
-        return frozenset[Item](closure_item_set)
+        return frozenset(closure_item_set)
     
     @staticmethod
     def get_next_elements(item_set: frozenset[Item]) -> set[FormulaElement]:
-        element_set = set[FormulaElement]()
+        element_set = set()
         for item in item_set:
             if element := item.get_current_element():
                 element_set.add(element)
@@ -110,13 +116,13 @@ class ItemSetUtils:
     
     @staticmethod
     def goto(item_set: frozenset[Item], element: FormulaElement) -> frozenset[Item]:
-        goto_item_set = set[Item]()
+        goto_item_set = set()
         for item in item_set:
             if current_element := item.get_current_element():
                 if current_element != element:
                     continue
                 goto_item_set.add(Item(item.formula, item.forward_index + 1, item.forward_token))
-        return frozenset[Item](goto_item_set)
+        return frozenset(goto_item_set)
     
     @staticmethod
     def get_next_items(item_set: frozenset[Item], element: FormulaElement, search_dict: dict[str, set[Formula]]) -> frozenset[Item]:
@@ -126,7 +132,7 @@ class ItemSetUtils:
 class ItemsNumberDict:
 
     def __init__(self) -> None:
-        self.items_number_dict = dict[frozenset[Item], int]()
+        self.items_number_dict = dict()
         self.items_count = 0
 
     def __contains__(self, key: frozenset[Item]) -> bool:

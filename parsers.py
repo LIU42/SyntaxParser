@@ -15,10 +15,10 @@ class SyntaxError:
 class SyntaxParser:
 
     def __init__(self, grammar_loader: GrammarLoader = GrammarLoader()) -> None:
+        self.symbol_stack = list()
+        self.status_stack = list()
         self.action_goto_table = ActionGotoTable(grammar_loader.get_formulas())
         self.action_goto_table.load()
-        self.symbol_stack = list[FormulaElement]()
-        self.status_stack = list[int]()
 
     def __call__(self, token_list: list[Token]) -> list[SyntaxError]:
         return self.parse(token_list)
@@ -74,7 +74,7 @@ class SyntaxParser:
         self.symbol_stack.append(FormulaElement(token = Token()))
         self.status_stack.append(0)
 
-        error_list = list[SyntaxError]()
+        error_list = list()
         token_index = 0
         parse_finished = False
         
