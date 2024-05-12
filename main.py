@@ -12,7 +12,7 @@ class MainProgram:
             token_list = TokenParser.parse_lines(input_file.readlines())
             error_list = self.parser(token_list)
 
-        with open(output_path, "w+", encoding = "utf-8") as output_file:
+        with open(output_path, "w", encoding = "utf-8") as output_file:
             if len(error_list) > 0:
                 output_file.write("Failure\n")
                 for error in error_list:

@@ -24,7 +24,7 @@ class Token:
             return hash(self.type)
         return hash(self.type) + hash(self.word)
     
-    def is_accept(self) -> bool:
+    def is_end(self) -> bool:
         return self.type == "ends" and self.word == "#"
 
 
@@ -145,9 +145,21 @@ class FormulaUtils:
 
 class GrammarLoader:
 
-    def __init__(self, grammar_path: str = "./grammars/grammar.json") -> None:
+    def __init__(self, grammar_path: str = "./grammars/grammar.json", message_path: str = "./grammars/message.json") -> None:
         with open(grammar_path, "r", encoding = "utf-8") as grammar_file:
             self.grammar_dict = json.load(grammar_file)
+        with open(message_path, "r", encoding = "utf-8") as message_file:
+            self.message_dict = json.load(message_file)
         
-    def get_formulas(self, label: str = "formulas") -> list[Formula]:
-        return FormulaParser.parse_list(self.grammar_dict[label])
+    def get_formulas(self) -> list[Formula]:
+        return FormulaParser.parse_list(self.grammar_dict["formulas"])
+    
+    def get_message_rules(self) -> dict[Token, str]:
+        message_rules = dict()
+        for rules in self.message_dict["messages"]:
+            message_rules.setdefault(TokenParser.parse_simply(rules["token"]), rules["message"])
+        return message_rules
+    
+    def get_default_message(self) -> str:
+        return self.message_dict["default"]
+       

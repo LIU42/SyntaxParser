@@ -15,5 +15,5 @@ class BuildRecorder:
         for item in item_set:
             self.item_sets_file.write(f"{item}\n")
 
-    def write_conflict(self, table_name: str, row: str, col: str, old_value: str, new_value: str) -> None:
-        self.conflicts_file.write(f"{table_name} ({row}, {col}) old: {old_value} new: {new_value}\n")
+    def write_conflict(self, table_name: str, row_index: str, col_index: str, old_value: str, new_value: str) -> None:
+        self.conflicts_file.write(f"{table_name} ({row_index}, {col_index}) old: {old_value} new: {new_value}\n")

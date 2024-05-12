@@ -5,26 +5,44 @@ from tables import ActionGotoTable
 
 class SyntaxError:
 
-    def __init__(self, token: Token) -> None:
+    def __init__(self, token: Token, message: str) -> None:
         self.token = token
+        self.message = message
 
     def __str__(self) -> str:
-        return f"Error at {self.token.line_no}:{self.token.index} \"{self.token.word}\""
+        return f"Error at {self.token.line_no}:{self.token.index} `{self.token.word}`: {self.message}"
+
+
+class ErrorBuilder:
+
+    def __init__(self, grammar_loader: GrammarLoader = None) -> None:
+        self.message_rules = grammar_loader.get_message_rules()
+        self.default_message = grammar_loader.get_default_message()
+
+    def __call__(self, token: Token) -> SyntaxError:
+        return self.build(token)
+
+    def build(self, token: Token) -> SyntaxError:
+        try:
+            return SyntaxError(token, self.message_rules[token])
+        except KeyError:
+            return SyntaxError(token, self.default_message)
 
 
 class SyntaxParser:
 
-    def __init__(self, grammar_loader: GrammarLoader = GrammarLoader()) -> None:
+    def __init__(self, grammar_loader: GrammarLoader = None) -> None:
         self.symbol_stack = list()
         self.status_stack = list()
         self.action_goto_table = ActionGotoTable(grammar_loader.get_formulas())
         self.action_goto_table.load()
+        self.error_builder = ErrorBuilder(grammar_loader)
 
     def __call__(self, token_list: list[Token]) -> list[SyntaxError]:
         return self.parse(token_list)
     
-    def action_error_handler(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
-        error_list.append(SyntaxError(token_list[token_index]))
+    def handle_action_error(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
+        error_list.append(self.error_builder(token_list[token_index]))
         token_index += 1
 
         while token_index < len(token_list):
@@ -34,8 +52,8 @@ class SyntaxParser:
 
         return token_index >= len(token_list), token_index
     
-    def goto_error_handler(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
-        error_list.append(SyntaxError(token_list[token_index]))
+    def handle_goto_error(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
+        error_list.append(self.error_builder(token_list[token_index]))
         return True, token_index
 
     def parse_process(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
@@ -44,7 +62,7 @@ class SyntaxParser:
         action_option = self.action_goto_table.get_action(current_status, current_token)
 
         if action_option is None:
-            return self.action_error_handler(token_list, token_index, error_list)
+            return self.handle_action_error(token_list, token_index, error_list)
         if action_option.is_accept():
             return True, token_index
         
@@ -63,7 +81,7 @@ class SyntaxParser:
 
             goto_status = self.action_goto_table.get_goto(self.status_stack[-1], reduce_formula.left_part.symbol)
             if goto_status is None:
-                return self.goto_error_handler(token_list, token_index, error_list)
+                return self.handle_goto_error(token_list, token_index, error_list)
             self.status_stack.append(goto_status)
             
         return False, token_index

@@ -172,7 +172,7 @@
         "[UnaryOperator] -> <operators,~>",
         "[UnaryOperator] -> <operators,!>",
         "[CastExpression] -> [UnaryExpression]",
-        "[CastExpression] -> <bounds,(> [TypeName] <bounds,)>",
+        "[CastExpression] -> <bounds,(> [TypeName] <bounds,)> [CastExpression]",
         "[MulExpression] -> [CastExpression]",
         "[MulExpression] -> [MulExpression] <operators,*> [CastExpression]",
         "[MulExpression] -> [MulExpression] <operators,/> [CastExpression]",

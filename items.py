@@ -107,7 +107,7 @@ class ItemSetUtils:
         return frozenset(closure_item_set)
     
     @staticmethod
-    def get_next_elements(item_set: frozenset[Item]) -> set[FormulaElement]:
+    def get_transform_elements(item_set: frozenset[Item]) -> set[FormulaElement]:
         element_set = set()
         for item in item_set:
             if element := item.get_current_element():

@@ -1,6 +1,6 @@
 Failure
-Error at 5:42 ";"
-Error at 7:32 "="
-Error at 11:44 ")"
-Error at 28:15 ","
-Error at 30:15 "=="
+Error at 5:42 `;`: Expected statement before `;`.
+Error at 7:32 `=`: Expected expression before or after `=`.
+Error at 11:44 `)`: Expected statement, expression or `(` before `)`, maybe it's redundant.
+Error at 28:15 `,`: Expected expression before `,`.
+Error at 30:15 `==`: Expected expression before or after `==`.

@@ -17,25 +17,25 @@ class AbstractTable:
         self.name = name
         self.recorder = recorder
 
-    def add_item(self, row: object, col: object, value: object) -> None:
-        if self.items.setdefault(row, dict()).get(col) is None:
-            self.items[row][col] = value
+    def add_item(self, row_index: object, col_index: object, value: object) -> None:
+        if col_index not in self.items.setdefault(row_index, dict()):
+            self.items[row_index][col_index] = value
         elif self.recorder is not None:
-            self.recorder.write_conflict(self.name, row, col, self.items[row][col], value)
+            self.recorder.write_conflict(self.name, row_index, col_index, self.items[row_index][col_index], value)
 
-    def get_item(self, row: object, col: object) -> object:
-        return self.items[row][col]
+    def get_item(self, row_index: object, col_index: object) -> object:
+        return self.items[row_index][col_index]
     
     def to_sparse_list(self) -> list[tuple[object, object, object]]:
         sparse_list = list()
-        for row, col_value_dict in self.items.items():
-            for col, value in col_value_dict.items():
-                sparse_list.append((row, col, value))
+        for row_index, col_value_dict in self.items.items():
+            for col_index, value in col_value_dict.items():
+                sparse_list.append((row_index, col_index, value))
         return sparse_list
 
     @staticmethod
-    def to_sparse_line(row: object, col: object, value: object) -> str:
-        return f"{str(row)} {str(col)} {str(value)}\n"
+    def to_sparse_line(row_index: object, col_index: object, value: object) -> str:
+        return f"{str(row_index)} {str(col_index)} {str(value)}\n"
     
     @staticmethod
     def get_sparse_items(line: str) -> list[str]:
@@ -91,7 +91,7 @@ class ActionTable(AbstractTable):
         self.add_item(status_from, token, option)
 
     def save(self, save_path: str) -> None:
-        with open(save_path, "w+", encoding = "utf-8") as save_file:
+        with open(save_path, "w", encoding = "utf-8") as save_file:
             for status_from, token, option in self.to_sparse_list():
                 save_file.write(AbstractTable.to_sparse_line(status_from, token, option))
 
@@ -114,7 +114,7 @@ class GotoTable(AbstractTable):
         self.add_item(status_from, symbol, status_to)
 
     def save(self, save_path: str) -> None:
-        with open(save_path, "w+", encoding = "utf-8") as save_file:
+        with open(save_path, "w", encoding = "utf-8") as save_file:
             for status_from, symbol, status_to in self.to_sparse_list():
                 save_file.write(AbstractTable.to_sparse_line(status_from, symbol, status_to))
 
@@ -149,7 +149,7 @@ class ActionGotoTable:
             items_buffer.clear()
 
             for items in current_item_sets:
-                for element in ItemSetUtils.get_next_elements(items):
+                for element in ItemSetUtils.get_transform_elements(items):
                     next_items = ItemSetUtils.get_next_items(items, element, search_dict)
 
                     if items_dict.try_add(next_items):
@@ -172,7 +172,7 @@ class ActionGotoTable:
             for item in item_set:
                 if not item.is_search_finished():
                     continue
-                if item.formula == self.formula_list[0] and item.forward_token.is_accept():
+                if item.formula == self.formula_list[0] and item.forward_token.is_end():
                     option = ActionOption(accept = True)
                 else:
                     option = ActionOption(option = "R", number = index_dict[item.formula])
