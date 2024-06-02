@@ -33,12 +33,12 @@ class TokenParser:
     @staticmethod
     def parse_full(input: str) -> Token:
         line_no, index, type, word = re.match(r"<(.+?), (.+?), (.+?), (.*)>", input).groups()
-        return Token(line_no = line_no, index = index, type = type, word = word)
+        return Token(line_no, index, type, word)
     
     @staticmethod
     def parse_simply(input: str) -> Token:
         type, word = re.match(r"<(.+?),(.*)>", input).groups()
-        return Token(type = type, word = word)
+        return Token(type=type, word=word)
     
     @staticmethod
     def parse_lines(token_lines: list[str]) -> list[Token]:
@@ -113,10 +113,10 @@ class FormulaParser:
         right_part = list()
         for item in right_part_content.split():
             if item[0] == "<":
-                right_part.append(FormulaElement(token = TokenParser.parse_simply(item)))
+                right_part.append(FormulaElement(token=TokenParser.parse_simply(item)))
             else:
-                right_part.append(FormulaElement(symbol = item))
-        return Formula(FormulaElement(symbol = left_part_content), right_part)
+                right_part.append(FormulaElement(symbol=item))
+        return Formula(FormulaElement(symbol=left_part_content), right_part)
     
     @staticmethod
     def parse_list(formulas: list[str]) -> list[Formula]:
@@ -131,7 +131,7 @@ class FormulaUtils:
     @staticmethod
     def get_index_dict(formula_list: list[Formula]) -> dict[Formula, int]:
         index_dict = dict()
-        for index, formula in enumerate(formula_list, start = 0):
+        for index, formula in enumerate(formula_list, start=0):
             index_dict[formula] = index
         return index_dict
     
@@ -146,9 +146,9 @@ class FormulaUtils:
 class GrammarLoader:
 
     def __init__(self, grammar_path: str = "./grammars/grammar.json", message_path: str = "./grammars/message.json") -> None:
-        with open(grammar_path, "r", encoding = "utf-8") as grammar_file:
+        with open(grammar_path, mode="r", encoding="utf-8") as grammar_file:
             self.grammar_dict = json.load(grammar_file)
-        with open(message_path, "r", encoding = "utf-8") as message_file:
+        with open(message_path, mode="r", encoding="utf-8") as message_file:
             self.message_dict = json.load(message_file)
         
     def get_formulas(self) -> list[Formula]:

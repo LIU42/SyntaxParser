@@ -3,8 +3,8 @@ from items import Item
 class BuildRecorder:
 
     def __init__(self, item_sets_path: str = "./records/itemsets.txt", conflicts_path: str = "./records/conflicts.txt") -> None:
-        self.item_sets_file = open(item_sets_path, "w+", encoding = "utf-8")
-        self.conflicts_file = open(conflicts_path, "w+", encoding = "utf-8")
+        self.item_sets_file = open(item_sets_path, mode="w", encoding="utf-8")
+        self.conflicts_file = open(conflicts_path, mode="w", encoding="utf-8")
 
     def __del__(self) -> None:
         self.item_sets_file.close()

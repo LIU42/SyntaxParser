@@ -1,6 +1,6 @@
-from language import Token
 from language import Formula
 from language import FormulaElement
+from language import Token
 
 class Item:
 

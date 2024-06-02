@@ -1,13 +1,14 @@
-from language import GrammarLoader
-from language import Token
-from language import TokenParser
-from language import Formula
-from language import FormulaElement
-from language import FormulaUtils
-
 from items import Item
 from items import ItemsNumberDict
 from items import ItemSetUtils
+
+from language import Formula
+from language import FormulaElement
+from language import FormulaUtils
+from language import GrammarLoader
+from language import Token
+from language import TokenParser
+
 from recorders import BuildRecorder
 
 class AbstractTable:
@@ -47,8 +48,8 @@ class StatusTransforms(AbstractTable):
     def __init__(self, name: str = "transforms", recorder: BuildRecorder = None) -> None:
         super().__init__(name, recorder)
     
-    def add_transform(self, status_from: int, element: FormulaElement, status_to: int) -> None:
-        self.add_item(status_from, element, status_to)
+    def add_transform(self, last_status: int, element: FormulaElement, next_status: int) -> None:
+        self.add_item(last_status, element, next_status)
 
 
 class ActionOption:
@@ -87,19 +88,19 @@ class ActionTable(AbstractTable):
     def __getitem__(self, action_index: tuple[int, Token]) -> ActionOption:
         return self.get_item(*action_index)
     
-    def add_action(self, status_from: int, token: Token, option: ActionOption) -> None:
-        self.add_item(status_from, token, option)
+    def add_action_item(self, last_status: int, token: Token, option: ActionOption) -> None:
+        return self.add_item(last_status, token, option)
 
     def save(self, save_path: str) -> None:
-        with open(save_path, "w", encoding = "utf-8") as save_file:
-            for status_from, token, option in self.to_sparse_list():
-                save_file.write(AbstractTable.to_sparse_line(status_from, token, option))
+        with open(save_path, mode="w", encoding="utf-8") as save_file:
+            for last_status, token, option in self.to_sparse_list():
+                save_file.write(AbstractTable.to_sparse_line(last_status, token, option))
 
     def load(self, load_path: str) -> None:
-        with open(load_path, "r", encoding = "utf-8") as load_file:
+        with open(load_path, mode="r", encoding="utf-8") as load_file:
             for line in load_file.readlines():
-                status_from, token, option = AbstractTable.get_sparse_items(line)
-                self.add_action(int(status_from), TokenParser.parse_simply(token), ActionOption.parse(option))
+                last_status, token, option = AbstractTable.get_sparse_items(line)
+                self.add_action_item(int(last_status), TokenParser.parse_simply(token), ActionOption.parse(option))
 
 
 class GotoTable(AbstractTable):
@@ -110,19 +111,19 @@ class GotoTable(AbstractTable):
     def __getitem__(self, goto_index: tuple[int, str]) -> int:
         return self.get_item(*goto_index)
 
-    def add_goto(self, status_from: int, symbol: str, status_to: int) -> None:
-        self.add_item(status_from, symbol, status_to)
+    def add_goto_item(self, last_status: int, symbol: str, next_status: int) -> None:
+        return self.add_item(last_status, symbol, next_status)
 
     def save(self, save_path: str) -> None:
-        with open(save_path, "w", encoding = "utf-8") as save_file:
-            for status_from, symbol, status_to in self.to_sparse_list():
-                save_file.write(AbstractTable.to_sparse_line(status_from, symbol, status_to))
+        with open(save_path, mode="w", encoding="utf-8") as save_file:
+            for last_status, symbol, next_status in self.to_sparse_list():
+                save_file.write(AbstractTable.to_sparse_line(last_status, symbol, next_status))
 
     def load(self, load_path: str) -> None:
-        with open(load_path, "r", encoding = "utf-8") as load_file:
+        with open(load_path, mode="r", encoding="utf-8") as load_file:
             for line in load_file.readlines():
-                status_from, symbol, status_to = AbstractTable.get_sparse_items(line)
-                self.add_goto(int(status_from), symbol, int(status_to))
+                last_status, symbol, next_status = AbstractTable.get_sparse_items(line)
+                self.add_goto_item(int(last_status), symbol, int(next_status))
 
 
 class ActionGotoTable:
@@ -130,11 +131,11 @@ class ActionGotoTable:
     def __init__(self, formula_list: list[Formula], recorder: BuildRecorder = None) -> None:
         self.formula_list = formula_list
         self.recorder = recorder
-        self.action_table = ActionTable(recorder = recorder)
-        self.goto_table = GotoTable(recorder = recorder)
+        self.action_table = ActionTable(recorder=recorder)
+        self.goto_table = GotoTable(recorder=recorder)
 
     def create_item_sets(self) -> tuple[ItemsNumberDict, StatusTransforms]:
-        transforms = StatusTransforms(recorder = self.recorder)
+        transforms = StatusTransforms(recorder=self.recorder)
         search_dict = FormulaUtils.get_search_dict(self.formula_list)
 
         init_items = ItemSetUtils.get_closure(ItemSetUtils.create_by_items(Item(self.formula_list[0])), search_dict)
@@ -160,11 +161,11 @@ class ActionGotoTable:
         return items_dict, transforms
     
     def setup_action_goto_table(self, items_dict: ItemsNumberDict, transforms: StatusTransforms) -> None:
-        for status_from, element, status_to in transforms.to_sparse_list():
+        for last_status, element, next_status in transforms.to_sparse_list():
             if element.is_token():
-                self.action_table.add_action(status_from, element.token, ActionOption(option = "S", number = status_to))
+                self.action_table.add_action_item(last_status, element.token, ActionOption(option="S", number=next_status))
             elif element.is_symbol():
-                self.goto_table.add_goto(status_from, element.symbol, status_to)
+                self.goto_table.add_goto_item(last_status, element.symbol, next_status)
 
         index_dict = FormulaUtils.get_index_dict(self.formula_list)
 
@@ -173,11 +174,11 @@ class ActionGotoTable:
                 if not item.is_search_finished():
                     continue
                 if item.formula == self.formula_list[0] and item.forward_token.is_end():
-                    option = ActionOption(accept = True)
+                    option = ActionOption(accept=True)
                 else:
-                    option = ActionOption(option = "R", number = index_dict[item.formula])
+                    option = ActionOption(option="R", number=index_dict[item.formula])
 
-                self.action_table.add_action(number, item.forward_token, option)
+                self.action_table.add_action_item(number, item.forward_token, option)
 
     def build(self) -> None:
         self.setup_action_goto_table(*self.create_item_sets())

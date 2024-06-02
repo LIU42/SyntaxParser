@@ -1,6 +1,6 @@
+from language import FormulaElement
 from language import GrammarLoader
 from language import Token
-from language import FormulaElement
 from tables import ActionGotoTable
 
 class SyntaxError:
@@ -67,7 +67,7 @@ class SyntaxParser:
             return True, token_index
         
         if action_option.is_shift():
-            self.symbol_stack.append(FormulaElement(token = current_token))
+            self.symbol_stack.append(FormulaElement(token=current_token))
             self.status_stack.append(action_option.number)
             token_index += 1
 
@@ -89,7 +89,7 @@ class SyntaxParser:
     def parse(self, token_list: list[Token]) -> list[SyntaxError]:
         self.symbol_stack.clear()
         self.status_stack.clear()
-        self.symbol_stack.append(FormulaElement(token = Token()))
+        self.symbol_stack.append(FormulaElement(token=Token()))
         self.status_stack.append(0)
 
         error_list = list()
