@@ -45,5 +45,5 @@
             "message": "Unexpected identifier, maybe it`s a spelling error."
         }
     ],
-    "default": "Unexpected token."
+    "defaults": "Unexpected token."
 }

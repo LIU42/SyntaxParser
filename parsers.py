@@ -1,101 +1,113 @@
-from language import FormulaElement
+from language import ElementBuilder
 from language import GrammarLoader
-from language import Token
+from language import TokenBuilder
+
 from tables import ActionGotoTable
+
 
 class SyntaxError:
 
-    def __init__(self, token: Token, message: str) -> None:
+    def __init__(self, token, message):
         self.token = token
         self.message = message
 
-    def __str__(self) -> str:
-        return f"Error at {self.token.line_no}:{self.token.index} `{self.token.word}`: {self.message}"
+    def __str__(self):
+        return f'Error at {self.token.line}:{self.token.index} `{self.token.word}`: {self.message}'
 
 
-class ErrorBuilder:
+class StatusManager:
 
-    def __init__(self, grammar_loader: GrammarLoader = None) -> None:
-        self.message_rules = grammar_loader.get_message_rules()
-        self.default_message = grammar_loader.get_default_message()
+    def __init__(self, token_list):
+        self.status_stack = [0]
+        self.symbol_stack = [ElementBuilder.token(TokenBuilder.ends())]
 
-    def __call__(self, token: Token) -> SyntaxError:
-        return self.build(token)
+        self.error_list = []
+        self.token_list = token_list
 
-    def build(self, token: Token) -> SyntaxError:
-        try:
-            return SyntaxError(token, self.message_rules[token])
-        except KeyError:
-            return SyntaxError(token, self.default_message)
+        self.token_index = 0
+        self.parse_finished = False
+
+    @property
+    def reached_end(self):
+        return self.token_index >= len(self.token_list)
+
+    @property
+    def finished(self):
+        return self.reached_end or self.parse_finished
+
+    @property
+    def status(self):
+        return self.status_stack[-1]
+
+    @property
+    def symbol(self):
+        return self.symbol_stack[-1]
+
+    @property
+    def token(self):
+        return self.token_list[self.token_index]
+
+    def push(self, status, symbol):
+        self.status_stack.append(status)
+        self.symbol_stack.append(symbol)
+
+    def pop(self, count):
+        del self.status_stack[-count:]
+        del self.symbol_stack[-count:]
+
+    def add_error(self, error):
+        self.error_list.append(error)
+
+    def next(self):
+        self.token_index += 1
 
 
 class SyntaxParser:
 
-    def __init__(self, grammar_loader: GrammarLoader = None) -> None:
-        self.symbol_stack = list()
-        self.status_stack = list()
-        self.action_goto_table = ActionGotoTable(grammar_loader.get_formulas())
-        self.action_goto_table.load()
-        self.error_builder = ErrorBuilder(grammar_loader)
+    def __init__(self):
+        self.tables = ActionGotoTable()
+        self.tables.load()
 
-    def __call__(self, token_list: list[Token]) -> list[SyntaxError]:
+        self.formulas = GrammarLoader.formulas()
+        self.messages = GrammarLoader.messages()
+
+    def __call__(self, token_list):
         return self.parse(token_list)
-    
-    def handle_action_error(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
-        error_list.append(self.error_builder(token_list[token_index]))
-        token_index += 1
 
-        while token_index < len(token_list):
-            if self.action_goto_table.get_action(self.status_stack[-1], token_list[token_index]) is not None:
-                break
-            token_index += 1
+    def error(self, token):
+        return SyntaxError(token, self.messages[token])
 
-        return token_index >= len(token_list), token_index
-    
-    def handle_goto_error(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
-        error_list.append(self.error_builder(token_list[token_index]))
-        return True, token_index
-
-    def parse_process(self, token_list: list[Token], token_index: int, error_list: list[SyntaxError]) -> tuple[bool, int]:
-        current_status = self.status_stack[-1]
-        current_token = token_list[token_index]
-        action_option = self.action_goto_table.get_action(current_status, current_token)
+    def parse_process(self, manager):
+        action_option = self.tables.action(manager.status, manager.token)
 
         if action_option is None:
-            return self.handle_action_error(token_list, token_index, error_list)
-        if action_option.is_accept():
-            return True, token_index
-        
-        if action_option.is_shift():
-            self.symbol_stack.append(FormulaElement(token=current_token))
-            self.status_stack.append(action_option.number)
-            token_index += 1
+            manager.add_error(self.error(manager.token))
+            manager.next()
 
-        elif action_option.is_reduce():
-            reduce_formula = self.action_goto_table.formula_list[action_option.number]
-            reduce_length = len(reduce_formula.right_part)
+            while not manager.reached_end and self.tables.action(manager.status, manager.token) is None:
+                manager.next()
 
-            self.status_stack = self.status_stack[:-reduce_length]
-            self.symbol_stack = self.symbol_stack[:-reduce_length]
-            self.symbol_stack.append(reduce_formula.left_part)
+        elif action_option.is_accept:
+            manager.parse_finished = True
 
-            goto_status = self.action_goto_table.get_goto(self.status_stack[-1], reduce_formula.left_part.symbol)
-            if goto_status is None:
-                return self.handle_goto_error(token_list, token_index, error_list)
-            self.status_stack.append(goto_status)
-            
-        return False, token_index
+        elif action_option.is_shift:
+            manager.push(action_option.number, ElementBuilder.token(manager.token))
+            manager.next()
 
-    def parse(self, token_list: list[Token]) -> list[SyntaxError]:
-        self.symbol_stack.clear()
-        self.status_stack.clear()
-        self.symbol_stack.append(FormulaElement(token=Token()))
-        self.status_stack.append(0)
+        elif action_option.is_reduce:
+            reduce_formula = self.formulas.list[action_option.number]
 
-        error_list = list()
-        token_index = 0
-        parse_finished = False
-        
-        while token_index < len(token_list) and not parse_finished:
-            parse_finished, token_index = self.parse_process(token_list, token_index, error_list)
-        return error_list
+            manager.pop(reduce_formula.length)
+            manager.push(self.tables.goto(manager.status, reduce_formula.lefts.symbol), reduce_formula.lefts)
+
+            if manager.status is None:
+                manager.add_error(self.error(manager.token))
+                manager.parse_finished = True
+
+    def parse(self, token_list):
+        manager = StatusManager(token_list)
+
+        while not manager.finished:
+            self.parse_process(manager)
+
+        return manager.error_list

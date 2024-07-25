@@ -1,4 +1,3 @@
-Failure
 Error at 5:42 `;`: Expected statement before `;`.
 Error at 7:32 `=`: Expected expression before or after `=`.
 Error at 11:44 `)`: Expected statement, expression or `(` before `)`, maybe it's redundant.

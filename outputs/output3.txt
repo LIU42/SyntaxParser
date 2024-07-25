@@ -1,2 +1,1 @@
-Failure
 Error at 15:4 `else`: The `else` without a previous `if`.

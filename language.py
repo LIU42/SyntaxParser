@@ -1,165 +1,226 @@
 import json
 import re
 
+from collections import defaultdict
+
+
 class Token:
 
-    def __init__(self, line_no: int = 0, index: int = 0, type: str = "ends", word: str = "#") -> None:
-        self.line_no = line_no
+    def __init__(self, line, index, type, word):
+        self.line = line
         self.index = index
         self.type = type
         self.word = word
 
-    def __str__(self) -> str:
-        return f"<{self.type},{self.word}>"
+    def __str__(self):
+        return f'<{self.type},{self.word}>'
 
-    def __eq__(self, token: 'Token') -> bool:
-        if self.type != token.type:
+    def __eq__(self, value):
+        if not isinstance(value, Token):
             return False
-        if self.type == "identifiers" or self.type == "constants":
+        if self.type != value.type:
+            return False
+        if self.type == 'identifiers' or self.type == 'constants':
             return True
-        return self.word == token.word
+        return self.word == value.word
     
-    def __hash__(self) -> int:
-        if self.type == "identifiers" or self.type == "constants":
+    def __hash__(self):
+        if self.type == 'identifiers' or self.type == 'constants':
             return hash(self.type)
-        return hash(self.type) + hash(self.word)
-    
-    def is_end(self) -> bool:
-        return self.type == "ends" and self.word == "#"
+        else:
+            return hash(self.type) + hash(self.word)
+
+    @property
+    def is_end(self):
+        return self.type == 'ends' and self.word == '#'
+
+
+class TokenBuilder:
+
+    @staticmethod
+    def ends():
+        return Token(line=0, index=0, type='ends', word='#')
+
+    @staticmethod
+    def full(line, index, type, word):
+        return Token(line=line, index=index, type=type, word=word)
+
+    @staticmethod
+    def simply(type, word):
+        return Token(line=0, index=0, type=type, word=word)
 
 
 class TokenParser:
 
     @staticmethod
-    def parse_full(input: str) -> Token:
-        line_no, index, type, word = re.match(r"<(.+?), (.+?), (.+?), (.*)>", input).groups()
-        return Token(line_no, index, type, word)
+    def full(input):
+        line, index, type, word = re.match(r'<(.+?), (.+?), (.+?), (.*)>', input).groups()
+        return TokenBuilder.full(line, index, type, word)
     
     @staticmethod
-    def parse_simply(input: str) -> Token:
-        type, word = re.match(r"<(.+?),(.*)>", input).groups()
-        return Token(type=type, word=word)
+    def simply(input):
+        type, word = re.match(r'<(.+?),(.*)>', input).groups()
+        return TokenBuilder.simply(type, word)
     
     @staticmethod
-    def parse_lines(token_lines: list[str]) -> list[Token]:
-        token_list = list()
-        for line in token_lines:
-            token_list.append(TokenParser.parse_full(line.strip()))
-        token_list.append(Token())
-        return token_list
+    def list(token_list):
+        return [TokenParser.full(token) for token in token_list] + [TokenBuilder.ends()]
 
 
 class FormulaElement:
 
-    def __init__(self, token: Token = None, symbol: str = None) -> None:
+    def __init__(self, token, symbol):
         self.token = token
         self.symbol = symbol
 
-    def __str__(self) -> str:
-        if self.token is not None:
+    def __str__(self):
+        if self.is_token:
             return str(self.token)
-        return self.symbol
+        else:
+            return str(self.symbol)
 
-    def __eq__(self, value: object) -> bool:
-        if isinstance(value, FormulaElement):
-            if self.is_token():
-                return value.token is not None and self.token == value.token
-            if self.is_symbol():
-                return value.symbol is not None and self.symbol == value.symbol
+    def __eq__(self, value):
+        if not isinstance(value, FormulaElement):
             return False
-        if isinstance(value, str):
-            return self.symbol == value
-        if isinstance(value, Token):
-            return self.token == value
+        if self.is_token:
+            return value.is_token and self.token == value.token
+        if self.is_symbol:
+            return value.is_symbol and self.symbol == value.symbol
         return False
     
-    def __hash__(self) -> int:
-        if self.token is not None:
+    def __hash__(self):
+        if self.is_token:
             return hash(self.token)
         else:
             return hash(self.symbol)
-    
-    def is_token(self) -> bool:
+
+    @property
+    def is_token(self):
         return self.token is not None
-    
-    def is_symbol(self) -> bool:
+
+    @property
+    def is_symbol(self):
         return self.symbol is not None
-    
+
+
+class ElementBuilder:
+
+    @staticmethod
+    def token(token):
+        return FormulaElement(token=token, symbol=None)
+
+    @staticmethod
+    def symbol(symbol):
+        return FormulaElement(token=None, symbol=symbol)
+
+
+class ElementUtils:
+
+    @staticmethod
+    def stringify(element_list):
+        return ' '.join(map(str, element_list))
+
 
 class Formula:
 
-    def __init__(self, left_part: FormulaElement, right_part: list[FormulaElement]) -> None:
-        self.left_part = left_part
-        self.right_part = right_part
+    def __init__(self, lefts, rights):
+        self.lefts = lefts
+        self.rights = rights
 
-    def __str__(self, split_symbol: str = " ") -> str:
-        return f"{self.left_part} -> {split_symbol.join(str(item) for item in self.right_part)}"
+    def __str__(self):
+        return f'{self.lefts} -> {ElementUtils.stringify(self.rights)}'
 
-    def __eq__(self, formula: 'Formula') -> bool:
-        return self.left_part == formula.left_part and self.right_part == formula.right_part
+    def __eq__(self, value):
+        if not isinstance(value, Formula):
+            return False
+        if self.lefts != value.lefts:
+            return False
+        if self.rights != value.rights:
+            return False
+        return True
     
-    def __hash__(self) -> int:
-        hash_code = hash(self.left_part) + len(self.right_part)
-        for item in self.right_part:
-            hash_code += hash(item)
-        return hash_code
+    def __hash__(self):
+        return hash(self.lefts) + len(self.rights) + sum(hash(item) for item in self.rights)
+
+    @property
+    def head(self):
+        return self.rights[0]
+
+    @property
+    def length(self):
+        return len(self.rights)
+
+
+class FormulasWrapper:
+
+    def __init__(self, formulas):
+        self.formulas = formulas
+        self.index_dict = defaultdict(int)
+        self.lefts_dict = defaultdict(set)
+        self.setup_dicts()
+
+    @property
+    def list(self):
+        return self.formulas
+
+    @property
+    def init(self):
+        return self.formulas[0]
+
+    def setup_dicts(self):
+        for index, formula in enumerate(self.formulas):
+            self.index_dict[formula] = index
+            self.lefts_dict[formula.lefts.symbol].add(formula)
+
+    def number(self, formula):
+        return self.index_dict[formula]
+
+    def search(self, symbol):
+        return self.lefts_dict[symbol]
 
 
 class FormulaParser:
 
     @staticmethod
-    def parse(input: str) -> Formula:
-        left_part_content, right_part_content = input.split(" -> ")
-        right_part = list()
-        for item in right_part_content.split():
-            if item[0] == "<":
-                right_part.append(FormulaElement(token=TokenParser.parse_simply(item)))
-            else:
-                right_part.append(FormulaElement(symbol=item))
-        return Formula(FormulaElement(symbol=left_part_content), right_part)
-    
-    @staticmethod
-    def parse_list(formulas: list[str]) -> list[Formula]:
-        formula_list = list()
-        for formula in formulas:
-            formula_list.append(FormulaParser.parse(formula.strip()))
-        return formula_list
-
-
-class FormulaUtils:
+    def item(item):
+        if item[0] == '<':
+            return ElementBuilder.token(TokenParser.simply(item))
+        else:
+            return ElementBuilder.symbol(item)
 
     @staticmethod
-    def get_index_dict(formula_list: list[Formula]) -> dict[Formula, int]:
-        index_dict = dict()
-        for index, formula in enumerate(formula_list, start=0):
-            index_dict[formula] = index
-        return index_dict
-    
+    def formula(input):
+        left_content, right_content = input.split(' -> ')
+
+        return Formula(ElementBuilder.symbol(left_content), [
+            FormulaParser.item(item) for item in right_content.split()
+        ])
+
     @staticmethod
-    def get_search_dict(formula_list: list[Formula]) -> dict[str, set[Formula]]:
-        search_dict = dict()
-        for formula in formula_list:
-            search_dict.setdefault(formula.left_part.symbol, set()).add(formula)
-        return search_dict
-    
+    def list(formulas):
+        return [FormulaParser.formula(formula.strip()) for formula in formulas]
+
 
 class GrammarLoader:
 
-    def __init__(self, grammar_path: str = "./grammars/grammar.json", message_path: str = "./grammars/message.json") -> None:
-        with open(grammar_path, mode="r", encoding="utf-8") as grammar_file:
-            self.grammar_dict = json.load(grammar_file)
-        with open(message_path, mode="r", encoding="utf-8") as message_file:
-            self.message_dict = json.load(message_file)
-        
-    def get_formulas(self) -> list[Formula]:
-        return FormulaParser.parse_list(self.grammar_dict["formulas"])
-    
-    def get_message_rules(self) -> dict[Token, str]:
-        message_rules = dict()
-        for rules in self.message_dict["messages"]:
-            message_rules.setdefault(TokenParser.parse_simply(rules["token"]), rules["message"])
+    @staticmethod
+    def formulas():
+        with open('grammars/grammar.json', mode='r') as grammar_json:
+            grammar_config = json.load(grammar_json)
+            formulas = grammar_config['formulas']
+
+        return FormulasWrapper(FormulaParser.list(formulas))
+
+    @staticmethod
+    def messages():
+        with open('grammars/message.json', mode='r') as message_json:
+            message_config = json.load(message_json)
+            messages = message_config['messages']
+            defaults = message_config['defaults']
+
+        message_rules = defaultdict(lambda: defaults)
+
+        for message in messages:
+            message_rules[TokenParser.simply(message['token'])] = message['message']
+
         return message_rules
-    
-    def get_default_message(self) -> str:
-        return self.message_dict["default"]
-       

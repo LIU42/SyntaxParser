@@ -1,210 +1,303 @@
-from items import Item
-from items import ItemsNumberDict
+from collections import defaultdict
+
+from items import ItemBuilder
+from items import ItemsNumber
 from items import ItemSetUtils
 
-from language import Formula
-from language import FormulaElement
-from language import FormulaUtils
 from language import GrammarLoader
-from language import Token
 from language import TokenParser
 
-from recorders import BuildRecorder
+
+class TableElement:
+
+    def __init__(self, row, col, value):
+        self.row = row
+        self.col = col
+        self.value = value
+
+    def __str__(self):
+        return self.sequences
+
+    @property
+    def sequences(self):
+        return f'{self.row} {self.col} {self.value}\n'
+
+    @property
+    def last_status(self):
+        return self.row
+
+    @property
+    def element(self):
+        return self.col
+
+    @property
+    def next_status(self):
+        return self.value
+
+
+class TableConflict:
+
+    def __init__(self, name, location, old_value, new_value):
+        self.name = name
+        self.row = location[0]
+        self.col = location[1]
+
+        self.old_value = old_value
+        self.new_value = new_value
+
+    def __str__(self):
+        return f'{self.name} ({self.row}, {self.col}) old: {self.old_value} new: {self.new_value}'
+
 
 class AbstractTable:
 
-    def __init__(self, name: str, recorder: BuildRecorder = None) -> None:
-        self.items = dict()
+    def __init__(self, name):
+        self.elements = defaultdict(dict)
         self.name = name
-        self.recorder = recorder
+        self.conflicts = []
 
-    def add_item(self, row_index: object, col_index: object, value: object) -> None:
-        if col_index not in self.items.setdefault(row_index, dict()):
-            self.items[row_index][col_index] = value
-        elif self.recorder is not None:
-            self.recorder.write_conflict(self.name, row_index, col_index, self.items[row_index][col_index], value)
+    def __getitem__(self, location):
+        row = location[0]
+        col = location[1]
+        return self.elements[row][col]
 
-    def get_item(self, row_index: object, col_index: object) -> object:
-        return self.items[row_index][col_index]
-    
-    def to_sparse_list(self) -> list[tuple[object, object, object]]:
-        sparse_list = list()
-        for row_index, col_value_dict in self.items.items():
-            for col_index, value in col_value_dict.items():
-                sparse_list.append((row_index, col_index, value))
-        return sparse_list
+    def add(self, location, value):
+        row = location[0]
+        col = location[1]
 
-    @staticmethod
-    def to_sparse_line(row_index: object, col_index: object, value: object) -> str:
-        return f"{str(row_index)} {str(col_index)} {str(value)}\n"
-    
-    @staticmethod
-    def get_sparse_items(line: str) -> list[str]:
-        return line.strip().split()
+        if col in self.elements[row]:
+            self.conflicts.append(TableConflict(self.name, location, self.elements[row][col], value))
+        else:
+            self.elements[row][col] = value
 
+    def add_elements(self, elements):
+        for element in elements:
+            self.elements[element.row][element.col] = element.value
 
-class StatusTransforms(AbstractTable):
-
-    def __init__(self, name: str = "transforms", recorder: BuildRecorder = None) -> None:
-        super().__init__(name, recorder)
-    
-    def add_transform(self, last_status: int, element: FormulaElement, next_status: int) -> None:
-        self.add_item(last_status, element, next_status)
+    @property
+    def element_list(self):
+        return [TableElement(row, col, value) for row, cols in self.elements.items() for col, value in cols.items()]
 
 
 class ActionOption:
 
-    def __init__(self, option: str = None, number: int = None, accept: bool = False) -> None:
+    def __init__(self, option, number):
         self.option = option
         self.number = number
-        self.accept = accept
-    
-    def __str__(self) -> str:
-        if self.accept:
-            return "accept"
-        return f"{self.option}{self.number}"
-    
+
+    def __str__(self):
+        return f'{self.option}-{self.number}'
+
+    @property
+    def is_accept(self):
+        return self.option == 'A'
+
+    @property
+    def is_shift(self):
+        return self.option == 'S'
+
+    @property
+    def is_reduce(self):
+        return self.option == 'R'
+
+
+class ActionBuilder:
+
     @staticmethod
-    def parse(input: str) -> 'ActionOption':
-        if input == "accept":
-            return ActionOption(accept = True)
-        return ActionOption(option = input[0], number = int(input[1:]))
-    
-    def is_shift(self) -> bool:
-        return self.option == "S"
-    
-    def is_reduce(self) -> bool:
-        return self.option == "R"
-    
-    def is_accept(self) -> bool:
-        return self.accept
+    def shift(status):
+        return ActionOption(option='S', number=int(status))
+
+    @staticmethod
+    def reduce(number):
+        return ActionOption(option='R', number=int(number))
+
+    @staticmethod
+    def accept():
+        return ActionOption(option='A', number=0)
+
+
+class ActionParser:
+
+    @staticmethod
+    def parse(input):
+        option, number = input.strip().split('-')
+
+        if option == 'A':
+            return ActionBuilder.accept()
+        if option == 'S':
+            return ActionBuilder.shift(number)
+        if option == 'R':
+            return ActionBuilder.reduce(number)
+        return None
 
 
 class ActionTable(AbstractTable):
 
-    def __init__(self, name: str = "actions", recorder: BuildRecorder = None) -> None:
-        super().__init__(name, recorder)
+    @staticmethod
+    def deserialize(input):
+        last_status, token, option = input.strip().split()
 
-    def __getitem__(self, action_index: tuple[int, Token]) -> ActionOption:
-        return self.get_item(*action_index)
-    
-    def add_action_item(self, last_status: int, token: Token, option: ActionOption) -> None:
-        return self.add_item(last_status, token, option)
+        token = TokenParser.simply(token)
+        option = ActionParser.parse(option)
 
-    def save(self, save_path: str) -> None:
-        with open(save_path, mode="w", encoding="utf-8") as save_file:
-            for last_status, token, option in self.to_sparse_list():
-                save_file.write(AbstractTable.to_sparse_line(last_status, token, option))
+        return TableElement(int(last_status), token, option)
 
-    def load(self, load_path: str) -> None:
-        with open(load_path, mode="r", encoding="utf-8") as load_file:
-            for line in load_file.readlines():
-                last_status, token, option = AbstractTable.get_sparse_items(line)
-                self.add_action_item(int(last_status), TokenParser.parse_simply(token), ActionOption.parse(option))
+    def save(self):
+        with open('tables/action.txt', mode='w') as actions:
+            actions.writelines(element.sequences for element in self.element_list)
+
+    def load(self):
+        with open('tables/action.txt', mode='r') as actions:
+            self.add_elements(map(self.deserialize, actions.readlines()))
 
 
 class GotoTable(AbstractTable):
 
-    def __init__(self, name: str = "gotos", recorder: BuildRecorder = None) -> None:
-        super().__init__(name, recorder)
+    @staticmethod
+    def deserialize(input):
+        last_status, symbol, next_status = input.strip().split()
 
-    def __getitem__(self, goto_index: tuple[int, str]) -> int:
-        return self.get_item(*goto_index)
+        last_status = int(last_status)
+        next_status = int(next_status)
 
-    def add_goto_item(self, last_status: int, symbol: str, next_status: int) -> None:
-        return self.add_item(last_status, symbol, next_status)
+        return TableElement(last_status, symbol, next_status)
 
-    def save(self, save_path: str) -> None:
-        with open(save_path, mode="w", encoding="utf-8") as save_file:
-            for last_status, symbol, next_status in self.to_sparse_list():
-                save_file.write(AbstractTable.to_sparse_line(last_status, symbol, next_status))
+    def save(self):
+        with open('tables/goto.txt', mode='w') as gotos:
+            gotos.writelines(element.sequences for element in self.element_list)
 
-    def load(self, load_path: str) -> None:
-        with open(load_path, mode="r", encoding="utf-8") as load_file:
-            for line in load_file.readlines():
-                last_status, symbol, next_status = AbstractTable.get_sparse_items(line)
-                self.add_goto_item(int(last_status), symbol, int(next_status))
+    def load(self):
+        with open('tables/goto.txt', mode='r') as gotos:
+            self.add_elements(map(self.deserialize, gotos.readlines()))
+
+
+class TableBuilder:
+
+    @staticmethod
+    def action():
+        return ActionTable('actions')
+
+    @staticmethod
+    def goto():
+        return GotoTable('gotos')
+
+    @staticmethod
+    def transforms():
+        return AbstractTable('transforms')
+
+
+class BuildResult:
+
+    def __init__(self, conflicts, items_number):
+        self.conflicts = conflicts
+        self.items_number = items_number
+
+    @property
+    def items_records(self):
+        for items, number in self.items_number.items:
+            for item in items:
+                yield f'items: {number} {item}\n'
+
+        yield f'total count: {self.items_number.items_count}\n'
+
+    @property
+    def conflict_records(self):
+        for conflict in self.conflicts:
+            yield f'{conflict}\n'
+
+    def save(self):
+        with open('records/items.txt', mode='w') as items:
+            items.writelines(self.items_records)
+
+        with open('records/conflicts.txt', mode='w') as conflicts:
+            conflicts.writelines(self.conflict_records)
 
 
 class ActionGotoTable:
 
-    def __init__(self, formula_list: list[Formula], recorder: BuildRecorder = None) -> None:
-        self.formula_list = formula_list
-        self.recorder = recorder
-        self.action_table = ActionTable(recorder=recorder)
-        self.goto_table = GotoTable(recorder=recorder)
+    def __init__(self):
+        self.actions = TableBuilder.action()
+        self.gotos = TableBuilder.goto()
 
-    def create_item_sets(self) -> tuple[ItemsNumberDict, StatusTransforms]:
-        transforms = StatusTransforms(recorder=self.recorder)
-        search_dict = FormulaUtils.get_search_dict(self.formula_list)
+    @staticmethod
+    def create_transforms(formulas):
+        transforms = TableBuilder.transforms()
+        init_items = ItemSetUtils.closure({ItemBuilder.default(formulas.init)}, formulas)
 
-        init_items = ItemSetUtils.get_closure(ItemSetUtils.create_by_items(Item(self.formula_list[0])), search_dict)
-        items_dict = ItemsNumberDict()
-        items_dict.try_add(init_items)
-
-        items_buffer = set()
-        items_buffer.add(init_items)
+        items_buffer = {init_items}
+        items_number = ItemsNumber(init_items)
 
         while len(items_buffer) > 0:
             current_item_sets = items_buffer.copy()
             items_buffer.clear()
 
             for items in current_item_sets:
-                for element in ItemSetUtils.get_transform_elements(items):
-                    next_items = ItemSetUtils.get_next_items(items, element, search_dict)
+                for element in ItemSetUtils.transform_elements(items):
+                    next_items = ItemSetUtils.next_items(items, element, formulas)
 
-                    if items_dict.try_add(next_items):
-                        self.recorder.write_items(items_dict[next_items], next_items)
+                    if next_items not in items_number:
+                        items_number.add(next_items)
                         items_buffer.add(next_items)
-                    transforms.add_transform(items_dict[items], element, items_dict[next_items])
 
-        return items_dict, transforms
+                    transforms.add((items_number[items], element), items_number[next_items])
+
+        return items_number, transforms
     
-    def setup_action_goto_table(self, items_dict: ItemsNumberDict, transforms: StatusTransforms) -> None:
-        for last_status, element, next_status in transforms.to_sparse_list():
-            if element.is_token():
-                self.action_table.add_action_item(last_status, element.token, ActionOption(option="S", number=next_status))
-            elif element.is_symbol():
-                self.goto_table.add_goto_item(last_status, element.symbol, next_status)
+    def setup_tables(self, formulas):
+        items_number, transforms = self.create_transforms(formulas)
 
-        index_dict = FormulaUtils.get_index_dict(self.formula_list)
+        for transform in transforms.element_list:
+            element = transform.element
+            last_status = transform.last_status
+            next_status = transform.next_status
 
-        for item_set, number in items_dict.items_number_dict.items():
-            for item in item_set:
-                if not item.is_search_finished():
+            if element.is_token:
+                self.actions.add((last_status, element.token), ActionBuilder.shift(next_status))
+            elif element.is_symbol:
+                self.gotos.add((last_status, element.symbol), next_status)
+
+        for items, number in items_number.items:
+            for item in items:
+                if not item.is_search_finished:
                     continue
-                if item.formula == self.formula_list[0] and item.forward_token.is_end():
-                    option = ActionOption(accept=True)
+                if item.formula == formulas.init and item.forward_token.is_end:
+                    option = ActionBuilder.accept()
                 else:
-                    option = ActionOption(option="R", number=index_dict[item.formula])
+                    option = ActionBuilder.reduce(formulas.number(item.formula))
 
-                self.action_table.add_action_item(number, item.forward_token, option)
+                self.actions.add((number, item.forward_token), option)
 
-    def build(self) -> None:
-        self.setup_action_goto_table(*self.create_item_sets())
+        return BuildResult(transforms.conflicts + self.actions.conflicts + self.gotos.conflicts, items_number)
 
-    def save(self, action_path: str = "./tables/action.txt", goto_path: str = "./tables/goto.txt") -> None:
-        self.action_table.save(action_path)
-        self.goto_table.save(goto_path)
+    def build(self, formulas):
+        self.setup_tables(formulas).save()
 
-    def load(self, action_path: str = "./tables/action.txt", goto_path: str = "./tables/goto.txt") -> None:
-        self.action_table.load(action_path)
-        self.goto_table.load(goto_path)
+    def save(self):
+        self.actions.save()
+        self.gotos.save()
 
-    def get_action(self, status_from: int, token: Token) -> ActionOption:
+    def load(self):
+        self.actions.load()
+        self.gotos.load()
+
+    def action(self, last_status, token):
         try:
-            return self.action_table[status_from, token]
-        except:
+            return self.actions[last_status, token]
+        except KeyError:
             return None
     
-    def get_goto(self, status_from: int, symbol: str) -> int:
+    def goto(self, last_status, symbol):
         try:
-            return self.goto_table[status_from, symbol]
-        except:
+            return self.gotos[last_status, symbol]
+        except KeyError:
             return None
 
 
-if __name__ == "__main__":
-    action_goto_table = ActionGotoTable(GrammarLoader().get_formulas(), BuildRecorder())
-    action_goto_table.build()
-    action_goto_table.save()
+def build():
+    tables = ActionGotoTable()
+    tables.build(GrammarLoader.formulas())
+    tables.save()
+
+
+if __name__ == '__main__':
+    build()
