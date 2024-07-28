@@ -15,14 +15,13 @@ class Token:
     def __str__(self):
         return f'<{self.type},{self.word}>'
 
-    def __eq__(self, value):
-        if not isinstance(value, Token):
-            return False
-        if self.type != value.type:
-            return False
-        if self.type == 'identifiers' or self.type == 'constants':
-            return True
-        return self.word == value.word
+    def __eq__(self, token):
+        if isinstance(token, Token):
+            if self.type == 'identifiers' or self.type == 'constants':
+                return self.type == token.type
+            else:
+                return self.type == token.type and self.word == token.word
+        return False
     
     def __hash__(self):
         if self.type == 'identifiers' or self.type == 'constants':
@@ -39,27 +38,37 @@ class TokenBuilder:
 
     @staticmethod
     def ends():
-        return Token(line=0, index=0, type='ends', word='#')
+        return Token(0, 0, 'ends', '#')
 
     @staticmethod
     def full(line, index, type, word):
-        return Token(line=line, index=index, type=type, word=word)
+        return Token(line, index, type, word)
 
     @staticmethod
     def simply(type, word):
-        return Token(line=0, index=0, type=type, word=word)
+        return Token(0, 0, type, word)
 
 
 class TokenParser:
 
     @staticmethod
     def full(input):
-        line, index, type, word = re.match(r'<(.+?), (.+?), (.+?), (.*)>', input).groups()
+        match = re.match(r'<(.+?), (.+?), (.+?), (.*)>', input)
+
+        line = match.group(1)
+        index = match.group(2)
+        type = match.group(3)
+        word = match.group(4)
+
         return TokenBuilder.full(line, index, type, word)
     
     @staticmethod
     def simply(input):
-        type, word = re.match(r'<(.+?),(.*)>', input).groups()
+        match = re.match(r'<(.+?),(.*)>', input)
+
+        type = match.group(1)
+        word = match.group(2)
+
         return TokenBuilder.simply(type, word)
     
     @staticmethod
@@ -79,13 +88,12 @@ class FormulaElement:
         else:
             return str(self.symbol)
 
-    def __eq__(self, value):
-        if not isinstance(value, FormulaElement):
-            return False
-        if self.is_token:
-            return value.is_token and self.token == value.token
-        if self.is_symbol:
-            return value.is_symbol and self.symbol == value.symbol
+    def __eq__(self, element):
+        if isinstance(element, FormulaElement):
+            if self.is_token:
+                return element.is_token and self.token == element.token
+            if self.is_symbol:
+                return element.is_symbol and self.symbol == element.symbol
         return False
     
     def __hash__(self):
@@ -107,11 +115,11 @@ class ElementBuilder:
 
     @staticmethod
     def token(token):
-        return FormulaElement(token=token, symbol=None)
+        return FormulaElement(token, None)
 
     @staticmethod
     def symbol(symbol):
-        return FormulaElement(token=None, symbol=symbol)
+        return FormulaElement(None, symbol)
 
 
 class ElementUtils:
@@ -130,17 +138,17 @@ class Formula:
     def __str__(self):
         return f'{self.lefts} -> {ElementUtils.stringify(self.rights)}'
 
-    def __eq__(self, value):
-        if not isinstance(value, Formula):
+    def __eq__(self, formula):
+        if not isinstance(formula, Formula):
             return False
-        if self.lefts != value.lefts:
+        if self.lefts != formula.lefts:
             return False
-        if self.rights != value.rights:
+        if self.rights != formula.rights:
             return False
         return True
-    
+
     def __hash__(self):
-        return hash(self.lefts) + len(self.rights) + sum(hash(item) for item in self.rights)
+        return hash(self.lefts) + sum(hash(item) for item in self.rights)
 
     @property
     def head(self):
@@ -205,7 +213,7 @@ class GrammarLoader:
 
     @staticmethod
     def formulas():
-        with open('grammars/grammar.json', mode='r') as grammar_json:
+        with open('grammars/grammar.json', 'r') as grammar_json:
             grammar_config = json.load(grammar_json)
             formulas = grammar_config['formulas']
 
@@ -213,7 +221,7 @@ class GrammarLoader:
 
     @staticmethod
     def messages():
-        with open('grammars/message.json', mode='r') as message_json:
+        with open('grammars/message.json', 'r') as message_json:
             message_config = json.load(message_json)
             messages = message_config['messages']
             defaults = message_config['defaults']

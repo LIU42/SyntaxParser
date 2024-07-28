@@ -11,14 +11,14 @@ class Item:
     def __str__(self):
         return f'{self.formula}, {self.forward_index}, {self.forward_token}'
 
-    def __eq__(self, value):
-        if not isinstance(value, Item):
+    def __eq__(self, item):
+        if not isinstance(item, Item):
             return False
-        if self.formula != value.formula:
+        if self.formula != item.formula:
             return False
-        if self.forward_index != value.forward_index:
+        if self.forward_index != item.forward_index:
             return False
-        if self.forward_token != value.forward_token:
+        if self.forward_token != item.forward_token:
             return False
         return True
     
@@ -26,7 +26,7 @@ class Item:
         return hash(self.formula) + hash(self.forward_index) + hash(self.forward_token)
 
     @property
-    def is_search_finished(self):
+    def search_finished(self):
         return self.forward_index >= len(self.formula.rights)
 
     @property
@@ -42,6 +42,10 @@ class Item:
             return self.formula.rights[self.forward_index + 1]
         except IndexError:
             return None
+
+    @property
+    def closure_enable(self):
+        return not self.search_finished and self.current_element.is_symbol
 
 
 class ItemBuilder:
@@ -62,9 +66,8 @@ class ItemSetUtils:
 
     @staticmethod
     def subsets(element, formulas, excepts):
-        for formula in formulas.search(element.symbol):
-            if formula.head.symbol not in excepts:
-                yield ItemSetUtils.first_set(formula.head, formulas, excepts)
+        for formula in filter(lambda formula: formula.head.symbol not in excepts, formulas.search(element.symbol)):
+            yield ItemSetUtils.first_set(formula.head, formulas, excepts)
 
     @staticmethod
     def first_set(element, formulas, excepts=None):
@@ -79,8 +82,8 @@ class ItemSetUtils:
         return {token for subset in ItemSetUtils.subsets(element, formulas, current_excepts) for token in subset}
 
     @staticmethod
-    def generate_forward_item(item, status, formulas):
-        for formula in formulas.search(status):
+    def generate_closure_item(item, formulas):
+        for formula in formulas.search(item.current_element.symbol):
             if next_element := item.next_element:
                 forward_set = ItemSetUtils.first_set(next_element, formulas)
             else:
@@ -90,24 +93,20 @@ class ItemSetUtils:
                 yield ItemBuilder.default(formula, forward_token=forward_token)
 
     @staticmethod
-    def forward_items(item, status, formulas):
-        return {item for item in ItemSetUtils.generate_forward_item(item, status, formulas)}
-    
+    def new_closure_items(item, closure, formulas):
+        return {item for item in ItemSetUtils.generate_closure_item(item, formulas) if item not in closure}
+
     @staticmethod
     def closure(items, formulas):
         item_closure = items.copy()
         item_buffer = items.copy()
 
         while len(item_buffer) > 0:
-            search_items = item_buffer.copy()
+            await_items = filter(lambda item: item.closure_enable, item_buffer.copy())
             item_buffer.clear()
 
-            for item in search_items:
-                if item.is_search_finished or item.current_element.is_token:
-                    continue
-                for forward_item in ItemSetUtils.forward_items(item, item.current_element.symbol, formulas):
-                    if forward_item not in item_closure:
-                        item_buffer.add(forward_item)
+            for item in await_items:
+                item_buffer = item_buffer.union(ItemSetUtils.new_closure_items(item, item_closure, formulas))
 
             item_closure = item_closure.union(item_buffer)
 
@@ -138,14 +137,11 @@ class ItemsNumber:
     def __getitem__(self, items):
         return self.items_number[items]
 
-    @property
-    def items(self):
-        return self.items_number.items()
+    def expand_items(self):
+        for items, number in self.items_number.items():
+            for item in items:
+                yield item, number
 
     def add(self, items):
         self.items_number[items] = self.items_count
         self.items_count += 1
-
-    def clear(self):
-        self.items_number.clear()
-        self.items_count = 0

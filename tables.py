@@ -18,35 +18,35 @@ class TableElement:
     def __str__(self):
         return self.sequences
 
+    def __iter__(self):
+        return iter((self.row, self.col, self.value))
+
     @property
     def sequences(self):
         return f'{self.row} {self.col} {self.value}\n'
 
-    @property
-    def last_status(self):
-        return self.row
-
-    @property
-    def element(self):
-        return self.col
-
-    @property
-    def next_status(self):
-        return self.value
-
 
 class TableConflict:
 
-    def __init__(self, name, location, old_value, new_value):
+    def __init__(self, name, row, col, old_value, new_value):
         self.name = name
-        self.row = location[0]
-        self.col = location[1]
-
+        self.row = row
+        self.col = col
         self.old_value = old_value
         self.new_value = new_value
 
     def __str__(self):
         return f'{self.name} ({self.row}, {self.col}) old: {self.old_value} new: {self.new_value}'
+
+
+class ConflictBuilder:
+
+    @staticmethod
+    def build(name, location, old_value, new_value):
+        row = location[0]
+        col = location[1]
+
+        return TableConflict(name, row, col, old_value, new_value)
 
 
 class AbstractTable:
@@ -59,18 +59,19 @@ class AbstractTable:
     def __getitem__(self, location):
         row = location[0]
         col = location[1]
+
         return self.elements[row][col]
 
-    def add(self, location, value):
+    def __setitem__(self, location, value):
         row = location[0]
         col = location[1]
 
         if col in self.elements[row]:
-            self.conflicts.append(TableConflict(self.name, location, self.elements[row][col], value))
+            self.conflicts.append(ConflictBuilder.build(self.name, location, self.elements[row][col], value))
         else:
             self.elements[row][col] = value
 
-    def add_elements(self, elements):
+    def set_elements(self, elements):
         for element in elements:
             self.elements[element.row][element.col] = element.value
 
@@ -143,12 +144,12 @@ class ActionTable(AbstractTable):
         return TableElement(int(last_status), token, option)
 
     def save(self):
-        with open('tables/action.txt', mode='w') as actions:
+        with open('tables/action.txt', 'w') as actions:
             actions.writelines(element.sequences for element in self.element_list)
 
     def load(self):
-        with open('tables/action.txt', mode='r') as actions:
-            self.add_elements(map(self.deserialize, actions.readlines()))
+        with open('tables/action.txt', 'r') as actions:
+            self.set_elements(map(self.deserialize, actions.readlines()))
 
 
 class GotoTable(AbstractTable):
@@ -163,12 +164,12 @@ class GotoTable(AbstractTable):
         return TableElement(last_status, symbol, next_status)
 
     def save(self):
-        with open('tables/goto.txt', mode='w') as gotos:
+        with open('tables/goto.txt', 'w') as gotos:
             gotos.writelines(element.sequences for element in self.element_list)
 
     def load(self):
-        with open('tables/goto.txt', mode='r') as gotos:
-            self.add_elements(map(self.deserialize, gotos.readlines()))
+        with open('tables/goto.txt', 'r') as gotos:
+            self.set_elements(map(self.deserialize, gotos.readlines()))
 
 
 class TableBuilder:
@@ -186,7 +187,7 @@ class TableBuilder:
         return AbstractTable('transforms')
 
 
-class BuildResult:
+class BuildReport:
 
     def __init__(self, conflicts, items_number):
         self.conflicts = conflicts
@@ -194,9 +195,8 @@ class BuildResult:
 
     @property
     def items_records(self):
-        for items, number in self.items_number.items:
-            for item in items:
-                yield f'items: {number} {item}\n'
+        for item, number in self.items_number.expand_items():
+            yield f'items: {number} {item}\n'
 
         yield f'total count: {self.items_number.items_count}\n'
 
@@ -206,10 +206,10 @@ class BuildResult:
             yield f'{conflict}\n'
 
     def save(self):
-        with open('records/items.txt', mode='w') as items:
+        with open('reports/items.txt', 'w') as items:
             items.writelines(self.items_records)
 
-        with open('records/conflicts.txt', mode='w') as conflicts:
+        with open('reports/conflicts.txt', 'w') as conflicts:
             conflicts.writelines(self.conflict_records)
 
 
@@ -239,35 +239,29 @@ class ActionGotoTable:
                         items_number.add(next_items)
                         items_buffer.add(next_items)
 
-                    transforms.add((items_number[items], element), items_number[next_items])
+                    transforms[items_number[items], element] = items_number[next_items]
 
         return items_number, transforms
     
     def setup_tables(self, formulas):
         items_number, transforms = self.create_transforms(formulas)
 
-        for transform in transforms.element_list:
-            element = transform.element
-            last_status = transform.last_status
-            next_status = transform.next_status
+        for last_status, element, next_status in transforms.element_list:
+            if element.is_symbol:
+                self.gotos[last_status, element.symbol] = next_status
+            else:
+                self.actions[last_status, element.token] = ActionBuilder.shift(next_status)
 
-            if element.is_token:
-                self.actions.add((last_status, element.token), ActionBuilder.shift(next_status))
-            elif element.is_symbol:
-                self.gotos.add((last_status, element.symbol), next_status)
-
-        for items, number in items_number.items:
-            for item in items:
-                if not item.is_search_finished:
-                    continue
+        for item, number in items_number.expand_items():
+            if item.search_finished:
                 if item.formula == formulas.init and item.forward_token.is_end:
                     option = ActionBuilder.accept()
                 else:
                     option = ActionBuilder.reduce(formulas.number(item.formula))
 
-                self.actions.add((number, item.forward_token), option)
+                self.actions[number, item.forward_token] = option
 
-        return BuildResult(transforms.conflicts + self.actions.conflicts + self.gotos.conflicts, items_number)
+        return BuildReport(transforms.conflicts + self.actions.conflicts + self.gotos.conflicts, items_number)
 
     def build(self, formulas):
         self.setup_tables(formulas).save()

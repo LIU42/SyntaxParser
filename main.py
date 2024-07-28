@@ -2,17 +2,11 @@ from language import TokenParser
 from parsers import SyntaxParser
 
 
-def preprocess(inputs):
-    return TokenParser.list(inputs)
-
-
 def syntax_parse(parser, source_path, result_path):
-    with open(source_path, mode='r') as sources, open(result_path, mode='w') as results:
-        inputs = sources.readlines()
+    with open(source_path, 'r') as sources:
+        error_list = parser(TokenParser.list(sources.readlines()))
 
-        token_list = preprocess(inputs)
-        error_list = parser(token_list)
-
+    with open(result_path, 'w') as results:
         results.writelines(f'{error}\n' for error in error_list)
 
 

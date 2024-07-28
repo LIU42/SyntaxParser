@@ -34,7 +34,7 @@
 
 ### 伪代码描述
 
-```c
+```
 创建状态栈和符号栈;
 
 while (指针未到达末尾 && 分析结束标志为假) {
@@ -96,10 +96,8 @@ grammars 目录下的 message.json 文件为本项目的错误信息配置文件
 
 本项目不依赖任何第三方库，由于文法产生式数量较多，构建 ACTION 表和 GOTO 表为一项耗时操作。运行 tables.py 文件即可根据配置的文法生成 ACTION 表和 GOTO 表并保存在本地：
 
-- 生成的 ACTION 表和 GOTO 表位于 tables 目录下，其中 action.txt 文件为 ACTION 表内容，goto.txt 文件为 GOTO 表内容
+- 生成的 ACTION 表和 GOTO 表位于 tables 目录下，其中 action.txt 文件为 ACTION 表内容，goto.txt 文件为 GOTO 表内容。
 
-- 生成过程的记录位于 records 目录下，其中 items.txt 文件为生成的项目集记录，conflicts.txt 文件为表项冲突记录
+- 生成报告位于 reports 目录下，其中 items.txt 文件为生成的项目集，conflicts.txt 文件为表项冲突。
 
 运行主程序 main.py 即可进行语法分析。本项目提供了一些测试用例，也可根据需要调整输入和输出文件路径。
-
-

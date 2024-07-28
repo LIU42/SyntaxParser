@@ -72,7 +72,12 @@ class SyntaxParser:
         self.messages = GrammarLoader.messages()
 
     def __call__(self, token_list):
-        return self.parse(token_list)
+        manager = StatusManager(token_list)
+
+        while not manager.finished:
+            self.parse_process(manager)
+
+        return manager.error_list
 
     def error(self, token):
         return SyntaxError(token, self.messages[token])
@@ -103,11 +108,3 @@ class SyntaxParser:
             if manager.status is None:
                 manager.add_error(self.error(manager.token))
                 manager.parse_finished = True
-
-    def parse(self, token_list):
-        manager = StatusManager(token_list)
-
-        while not manager.finished:
-            self.parse_process(manager)
-
-        return manager.error_list
