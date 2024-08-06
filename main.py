@@ -12,10 +12,10 @@ def syntax_parse(parser, source_path, result_path):
 
 def main():
     parser = SyntaxParser()
-    syntax_parse(parser, 'inputs/input1.txt', 'outputs/output1.txt')
-    syntax_parse(parser, 'inputs/input2.txt', 'outputs/output2.txt')
-    syntax_parse(parser, 'inputs/input3.txt', 'outputs/output3.txt')
-    syntax_parse(parser, 'inputs/input4.txt', 'outputs/output4.txt')
+    syntax_parse(parser, 'sources/source1.txt', 'results/result1.txt')
+    syntax_parse(parser, 'sources/source2.txt', 'results/result2.txt')
+    syntax_parse(parser, 'sources/source3.txt', 'results/result3.txt')
+    syntax_parse(parser, 'sources/source4.txt', 'results/result4.txt')
 
 
 if __name__ == '__main__':
