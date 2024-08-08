@@ -1,49 +1,49 @@
 {
-    "messages": [
-        {
-            "token": "<keywords,else>",
-            "message": "The `else` without a previous `if`."
-        },
-        {
-            "token": "<operators,==>",
-            "message": "Expected expression before or after `==`."
-        },
-        {
-            "token": "<operators,!=>",
-            "message": "Expected expression before or after `!=`."
-        },
-        {
-            "token": "<operators,=>",
-            "message": "Expected expression before or after `=`."
-        },
-        {
-            "token": "<bounds,;>",
-            "message": "Expected statement before `;`."
-        },
-        {
-            "token": "<operators,,>",
-            "message": "Expected expression before `,`."
-        },
-        {
-            "token": "<bounds,)>",
-            "message": "Expected statement, expression or `(` before `)`, maybe it's redundant."
-        },
-        {
-            "token": "<bounds,]>",
-            "message": "Expected expression or `[` before `]`, maybe it's redundant."
-        },
-        {
-            "token": "<bounds,{>",
-            "message": "Expected `=`, `;` or identifier before `{`, maybe it's redundant."
-        },
-        {
-            "token": "<bounds,}>",
-            "message": "Expected statement or `{` before `}`, maybe it's redundant."
-        },
-        {
-            "token": "<identifiers,>",
-            "message": "Unexpected identifier, maybe it`s a spelling error."
-        }
-    ],
-    "defaults": "Unexpected token."
+  "messages": [
+    {
+      "token": "<keywords,else>",
+      "message": "The `else` without a previous `if`."
+    },
+    {
+      "token": "<operators,==>",
+      "message": "Expected expression before or after `==`."
+    },
+    {
+      "token": "<operators,!=>",
+      "message": "Expected expression before or after `!=`."
+    },
+    {
+      "token": "<operators,=>",
+      "message": "Expected expression before or after `=`."
+    },
+    {
+      "token": "<bounds,;>",
+      "message": "Expected statement before `;`."
+    },
+    {
+      "token": "<operators,,>",
+      "message": "Expected expression before `,`."
+    },
+    {
+      "token": "<bounds,)>",
+      "message": "Expected statement, expression or `(` before `)`, maybe it's redundant."
+    },
+    {
+      "token": "<bounds,]>",
+      "message": "Expected expression or `[` before `]`, maybe it's redundant."
+    },
+    {
+      "token": "<bounds,{>",
+      "message": "Expected `=`, `;` or identifier before `{`, maybe it's redundant."
+    },
+    {
+      "token": "<bounds,}>",
+      "message": "Expected statement or `{` before `}`, maybe it's redundant."
+    },
+    {
+      "token": "<identifiers,>",
+      "message": "Unexpected identifier, maybe it`s a spelling error."
+    }
+  ],
+  "defaults": "Unexpected token."
 }

@@ -131,40 +131,40 @@ class ElementUtils:
 
 class Formula:
 
-    def __init__(self, lefts, rights):
-        self.lefts = lefts
-        self.rights = rights
+    def __init__(self, l_part, r_part):
+        self.l_part = l_part
+        self.r_part = r_part
 
     def __str__(self):
-        return f'{self.lefts} -> {ElementUtils.stringify(self.rights)}'
+        return f'{self.l_part} -> {ElementUtils.stringify(self.r_part)}'
 
     def __eq__(self, formula):
         if not isinstance(formula, Formula):
             return False
-        if self.lefts != formula.lefts:
+        if self.l_part != formula.l_part:
             return False
-        if self.rights != formula.rights:
+        if self.r_part != formula.r_part:
             return False
         return True
 
     def __hash__(self):
-        return hash(self.lefts) + sum(hash(item) for item in self.rights)
+        return hash(self.l_part) + sum(hash(item) for item in self.r_part)
 
     @property
     def head(self):
-        return self.rights[0]
+        return self.r_part[0]
 
     @property
     def length(self):
-        return len(self.rights)
+        return len(self.r_part)
 
 
 class FormulasWrapper:
 
     def __init__(self, formulas):
         self.formulas = formulas
-        self.index_dict = defaultdict(int)
-        self.lefts_dict = defaultdict(set)
+        self.number_dict = defaultdict(int)
+        self.symbol_dict = defaultdict(set)
         self.setup_dicts()
 
     @property
@@ -176,15 +176,15 @@ class FormulasWrapper:
         return self.formulas[0]
 
     def setup_dicts(self):
-        for index, formula in enumerate(self.formulas):
-            self.index_dict[formula] = index
-            self.lefts_dict[formula.lefts.symbol].add(formula)
+        for number, formula in enumerate(self.formulas):
+            self.number_dict[formula] = number
+            self.symbol_dict[formula.l_part.symbol].add(formula)
 
     def number(self, formula):
-        return self.index_dict[formula]
+        return self.number_dict[formula]
 
     def search(self, symbol):
-        return self.lefts_dict[symbol]
+        return self.symbol_dict[symbol]
 
 
 class FormulaParser:

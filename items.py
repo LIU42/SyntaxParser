@@ -27,19 +27,19 @@ class Item:
 
     @property
     def search_finished(self):
-        return self.forward_index >= len(self.formula.rights)
+        return self.forward_index >= self.formula.length
 
     @property
     def current_element(self):
         try:
-            return self.formula.rights[self.forward_index]
+            return self.formula.r_part[self.forward_index]
         except IndexError:
             return None
 
     @property
     def next_element(self):
         try:
-            return self.formula.rights[self.forward_index + 1]
+            return self.formula.r_part[self.forward_index + 1]
         except IndexError:
             return None
 

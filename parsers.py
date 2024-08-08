@@ -103,7 +103,7 @@ class SyntaxParser:
             reduce_formula = self.formulas.list[action_option.number]
 
             manager.pop(reduce_formula.length)
-            manager.push(self.tables.goto(manager.status, reduce_formula.lefts.symbol), reduce_formula.lefts)
+            manager.push(self.tables.goto(manager.status, reduce_formula.l_part.symbol), reduce_formula.l_part)
 
             if manager.status is None:
                 manager.add_error(self.error(manager.token))
